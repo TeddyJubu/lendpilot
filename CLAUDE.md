@@ -5,6 +5,13 @@ An AI-first CRM where the broker handles decisions and the AI handles everything
 3 views (Today, Pipeline, Contacts) + Cmd+K command bar + AI Copilot panel.
 Full PRD: `docs/PRD.md`
 
+## MANDATORY: Before Writing Any Code
+1. Read this file (`CLAUDE.md`) — architecture and rules
+2. Read `IMPLEMENTATION.md` — the step-by-step process, tissue lifecycle, AI comment standard, and verification protocol
+3. Read `DESIGN_SYSTEM.md` — if doing any UI work
+4. Identify your Chapter → Phase → Organ → Tissue before touching any code
+5. Follow the Tissue Lifecycle: SPEC → SCAFFOLD → CONTRACT → TEST → IMPLEMENT → VERIFY → DOCUMENT
+
 ## Stack
 - **Frontend:** Next.js 15 (App Router) + TypeScript + Tailwind CSS + shadcn/ui + cmdk
 - **Backend:** Convex (real-time DB, serverless functions, file storage, cron triggers)
@@ -45,14 +52,24 @@ templates   — email/SMS/condition-response templates, variables
 rates       — rate snapshots from scraper, product lookups
 ```
 
-### Cloudflare Workers (Intelligence Layer — separate repo/deployment)
+### Cloudflare Workers (Intelligence Layer — `services/mortgage-data-engine/`)
+The intelligence layer is a single Cloudflare Worker (`mortgage-data-engine`) using Hono router,
+with D1 (operational store/cache), R2 (document storage), Browser Rendering (scraping), and Workers AI (Llama 3.1 8B/70B).
+After crawling, results sync to Convex via authenticated HTTP actions (Convex is the frontend source of truth).
+
+**Existing crawlers (implemented):**
 ```
-ai-gateway      — Cmd+K intent parsing, copilot chat, email drafting, lead scoring, summarization
-rate-scraper    — wholesale (4h) + retail (daily) + DPA (weekly) via Firecrawl → Convex HTTP action
-lead-enricher   — triggered on contact.created → Zillow/Redfin/LinkedIn → enrichment write-back
-los-sync        — Durable Object for Encompass/LendingPad bidirectional sync
-doc-intel       — OCR via Workers AI, validation, classification → update document record
-refi-monitor    — compare funded loans vs current rates → create feed items for opportunities
+rate-scraper     — wholesale (4h cron) + retail (daily cron) + DPA (weekly) + regulatory (daily)
+lead-enricher    — on-demand via webhook/API → Zillow/Redfin/LinkedIn → property + person enrichment
+```
+
+**To be added (by phase):**
+```
+ai-gateway       — Phase 6: Cmd+K intent parsing, copilot chat, email drafting, lead scoring
+convex-sync      — Phase 6: Write-back layer from D1 → Convex HTTP actions
+doc-intel        — Phase 8: OCR via Workers AI, document validation, classification
+refi-monitor     — Phase 9: Compare funded loans vs current rates → feed items
+los-sync         — Phase 10: Separate Worker with Durable Objects for Encompass/LendingPad
 ```
 
 ### Frontend Organs (UI Layer)
@@ -598,7 +615,23 @@ Do NOT advance to the next phase until all tests pass and behavior is manually v
 
 ## File Structure
 
+Full monorepo layout and implementation details: see `IMPLEMENTATION.md` Part 2.
+
 ```
+loanpilot/
+├── CLAUDE.md               # This file
+├── IMPLEMENTATION.md        # Process guide
+├── DESIGN_SYSTEM.md         # Design system
+├── docs/PRD.md              # Product spec
+│
+├── apps/web/                # Next.js frontend + Convex backend
+│   ├── convex/              # Convex organs live here
+│   └── src/                 # Frontend code
+│
+└── services/
+    └── mortgage-data-engine/  # Cloudflare Worker (intelligence layer)
+
+# Inside apps/web/convex/:
 convex/
   schema.ts                 # imports all organ tables, single defineSchema()
   types.ts                  # shared TypeScript types
