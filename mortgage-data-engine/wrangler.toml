@@ -1,0 +1,48 @@
+name = "mortgage-data-engine"
+main = "src/index.ts"
+compatibility_date = "2024-06-14"
+compatibility_flags = ["nodejs_compat"]
+
+# ─── Cloudflare D1 Database ───
+[[d1_databases]]
+binding = "DB"
+database_name = "mortgage-data-engine"
+database_id = "YOUR_D1_DATABASE_ID"  # Run: wrangler d1 create mortgage-data-engine
+
+# ─── R2 Storage (rate sheet archives, crawl logs) ───
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "mortgage-data-storage"
+
+# ─── Browser Rendering (replaces Firecrawl) ───
+[browser]
+binding = "BROWSER"
+
+# ─── Workers AI (structured extraction) ───
+[ai]
+binding = "AI"
+
+# ─── KV Namespace (caching, rate limiting) ───
+[[kv_namespaces]]
+binding = "CACHE"
+id = "YOUR_KV_NAMESPACE_ID"  # Run: wrangler kv namespace create CACHE
+
+# ─── Cron Triggers (scheduling) ───
+[triggers]
+crons = [
+  "0 2,6,10,14,18,22 * * *",   # Wholesale rates — every 4 hours
+  "0 10 * * *",                  # Retail rates — daily 6 AM ET (10 UTC)
+  "0 11 * * *",                  # Regulatory updates — daily 7 AM ET
+  "0 12 * * 1",                  # DPA programs — Mondays (future P1)
+  "0 12 * * 3"                   # Realtor profiles — Wednesdays (future P2)
+]
+
+# ─── Environment Variables ───
+[vars]
+ENVIRONMENT = "production"
+CREDIT_BUDGET_MONTHLY = "13350"
+ALERT_WEBHOOK_URL = ""  # Slack/Discord webhook for alerts
+
+# ─── Secrets (set via: wrangler secret put SECRET_NAME) ───
+# ADMIN_API_KEY — for manual trigger endpoints
+# BROKER_WEBHOOK_SECRET — for CRM lead.created webhooks
