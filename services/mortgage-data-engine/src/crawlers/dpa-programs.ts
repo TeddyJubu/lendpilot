@@ -8,7 +8,7 @@
  * ~250 credits/month (55 sites × ~2 pages × 4 weeks)
  */
 
-import type { Env } from "../types";
+import type { Env, CrawlStatus } from "../types";
 import { simpleFetch, scrapeUrl, extractStructured } from "../utils/browser-scraper";
 import {
   createCrawlJob,
@@ -320,7 +320,8 @@ export async function crawlDPAPrograms(env: Env): Promise<{
 
   // Finalize
   const creditsUsed = DPA_SOURCES.length;
-  const status = urlsFailed > DPA_SOURCES.length * 0.3 ? "partial" : "completed";
+  const status: CrawlStatus =
+    urlsFailed > DPA_SOURCES.length * 0.3 ? "partial" : "completed";
 
   await updateCrawlJob(env.DB, jobId, {
     status,
@@ -334,5 +335,13 @@ export async function crawlDPAPrograms(env: Env): Promise<{
 
   await logCredits(env.DB, jobId, "dpa_programs", creditsUsed);
 
-  return { jobId, success: status !== "failed", recordsCreated, recordsUpdated, errors };
+  return {
+    jobId,
+    // `status` is currently computed as completed|partial, but keep the success predicate
+    // future-proof for when the crawler can mark the job as failed.
+    success: status === "completed" || status === "partial",
+    recordsCreated,
+    recordsUpdated,
+    errors,
+  };
 }

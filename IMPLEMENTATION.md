@@ -202,7 +202,7 @@ loanpilot/
 
 ### 2.2 Where mortgage-data-engine Fits
 
-The existing `mortgage-data-engine/` moves to `services/mortgage-data-engine/`. It is the **Cloudflare intelligence layer** — one of the two backend pillars alongside Convex.
+The `mortgage-data-engine` Worker lives at `services/mortgage-data-engine/` (migrated from the repo root). It is the **Cloudflare intelligence layer** — one of the two backend pillars alongside Convex.
 
 **Current state:** Contains rate-scraper, lead-enricher, DPA, and regulatory crawlers. All working, using D1 for storage.
 
@@ -231,7 +231,7 @@ The entire LoanPilot build is divided into 5 chapters. Each chapter has phases. 
 |------|--------|--------|
 | Init Next.js 15 app in `apps/web/` | `next.config.ts`, `package.json` | `pnpm dev` starts without errors |
 | Init Convex in `apps/web/` | `convex/` directory, `convex.json` | `npx convex dev` connects |
-| Move `mortgage-data-engine/` to `services/` | Folder relocated | `cd services/mortgage-data-engine && pnpm install` works |
+| Ensure worker is at `services/mortgage-data-engine/` | Folder relocated | `cd services/mortgage-data-engine && npm install` works |
 | Set up Tailwind v4 with `globals.css` | All tokens from DESIGN_SYSTEM.md Section 3 | Tokens resolve: `bg-primary` renders correct color |
 | Install Geist fonts | Font loaded in layout.tsx | Text renders in Geist |
 | Configure `tsconfig.json` strict mode | `strict: true` in all packages | No implicit any allowed |

@@ -12,7 +12,7 @@
  * 5. Track credits and report results
  */
 
-import type { Env } from "../types";
+import type { Env, CrawlStatus } from "../types";
 import { scrapeUrl, simpleFetch, extractStructured } from "../utils/browser-scraper";
 import {
   createCrawlJob,
@@ -219,7 +219,7 @@ export async function crawlWholesaleRates(env: Env): Promise<{
 
   // 5. Finalize job
   const creditsUsed = lenders.length; // 1 credit per lender (approximate)
-  const status =
+  const status: CrawlStatus =
     urlsFailed === 0
       ? "completed"
       : urlsFailed > lenders.length * 0.2
@@ -237,5 +237,12 @@ export async function crawlWholesaleRates(env: Env): Promise<{
 
   await logCredits(env.DB, jobId, "wholesale_rates", creditsUsed);
 
-  return { jobId, success: status !== "failed", recordsCreated, errors };
+  return {
+    jobId,
+    // `status` is currently computed as completed|partial, but keep the success predicate
+    // future-proof for when the crawler can mark the job as failed.
+    success: status === "completed" || status === "partial",
+    recordsCreated,
+    errors,
+  };
 }

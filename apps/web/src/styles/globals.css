@@ -1,0 +1,218 @@
+/**
+ * @organ shell
+ * @tissue styles
+ * @description Global Tailwind v4 + design token foundation for the web app.
+ *   Defines OKLCH CSS variables for light/dark themes per DESIGN_SYSTEM.md.
+ * @depends-on
+ *   - tailwindcss v4 (@import "tailwindcss")
+ *   - tw-animate-css (@import "tw-animate-css")
+ * @depended-by
+ *   - src/app/layout.tsx (imports this stylesheet)
+ * @ai-notes
+ *   - Do NOT use raw Tailwind colors in app code (e.g. red-500). Use tokens.
+ *   - If you add a new token, bind it in @theme inline so Tailwind utilities resolve.
+ */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Surface */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  /* Brand */
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.965 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+
+  /* Utility */
+  --muted: oklch(0.965 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.965 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+
+  /* Borders */
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* Geometry */
+  --radius: 0.5rem;
+
+  /* Sidebar */
+  --sidebar-background: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.376 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.965 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Status colors */
+  --status-success: oklch(0.648 0.15 160);
+  --status-success-foreground: oklch(0.985 0 0);
+  --status-success-muted: oklch(0.962 0.044 156);
+  --status-active: oklch(0.623 0.214 259);
+  --status-active-foreground: oklch(0.985 0 0);
+  --status-active-muted: oklch(0.943 0.05 260);
+  --status-warning: oklch(0.75 0.183 55);
+  --status-warning-foreground: oklch(0.985 0 0);
+  --status-warning-muted: oklch(0.962 0.059 70);
+  --status-danger: oklch(0.577 0.245 27);
+  --status-danger-foreground: oklch(0.985 0 0);
+  --status-danger-muted: oklch(0.956 0.054 22);
+  --status-info: oklch(0.556 0 0);
+  --status-info-foreground: oklch(0.985 0 0);
+  --status-info-muted: oklch(0.965 0 0);
+
+  /* Priority */
+  --priority-urgent: oklch(0.577 0.245 27);
+  --priority-high: oklch(0.75 0.183 55);
+  --priority-medium: oklch(0.623 0.214 259);
+  --priority-low: oklch(0.556 0 0);
+
+  /* Pipeline stage */
+  --stage-intake: oklch(0.556 0 0);
+  --stage-qualification: oklch(0.623 0.214 259);
+  --stage-processing: oklch(0.75 0.183 55);
+  --stage-closing: oklch(0.648 0.15 160);
+  --stage-terminal-success: oklch(0.648 0.15 160);
+  --stage-terminal-fail: oklch(0.577 0.245 27);
+
+  /* Chart */
+  --chart-1: oklch(0.205 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.623 0.214 259);
+  --chart-4: oklch(0.648 0.15 160);
+  --chart-5: oklch(0.75 0.183 55);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.175 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.175 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.556 0 0);
+
+  --sidebar-background: oklch(0.16 0 0);
+  --sidebar-foreground: oklch(0.708 0 0);
+  --sidebar-primary: oklch(0.985 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-status-success: var(--status-success);
+  --color-status-success-foreground: var(--status-success-foreground);
+  --color-status-success-muted: var(--status-success-muted);
+  --color-status-active: var(--status-active);
+  --color-status-active-foreground: var(--status-active-foreground);
+  --color-status-active-muted: var(--status-active-muted);
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-foreground: var(--status-warning-foreground);
+  --color-status-warning-muted: var(--status-warning-muted);
+  --color-status-danger: var(--status-danger);
+  --color-status-danger-foreground: var(--status-danger-foreground);
+  --color-status-danger-muted: var(--status-danger-muted);
+  --color-status-info: var(--status-info);
+  --color-status-info-foreground: var(--status-info-foreground);
+  --color-status-info-muted: var(--status-info-muted);
+
+  --color-priority-urgent: var(--priority-urgent);
+  --color-priority-high: var(--priority-high);
+  --color-priority-medium: var(--priority-medium);
+  --color-priority-low: var(--priority-low);
+
+  --color-stage-intake: var(--stage-intake);
+  --color-stage-qualification: var(--stage-qualification);
+  --color-stage-processing: var(--stage-processing);
+  --color-stage-closing: var(--stage-closing);
+  --color-stage-terminal-success: var(--stage-terminal-success);
+  --color-stage-terminal-fail: var(--stage-terminal-fail);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar-background: var(--sidebar-background);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius));
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+
+  /* next/font assigns these CSS vars in layout.tsx */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}

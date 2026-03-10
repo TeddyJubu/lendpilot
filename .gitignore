@@ -13,11 +13,20 @@ pnpm-debug.log*
 .env.*
 .dev.vars
 
+# Allow committed env templates
+!.env.example
+!.env.*.example
+!.dev.vars.example
+
 # Build outputs
 **/dist/
 **/.next/
 **/out/
 coverage/
+
+# Convex
+**/convex/_generated/
+**/.convex/
 
 # Cloudflare Wrangler
 .wrangler/

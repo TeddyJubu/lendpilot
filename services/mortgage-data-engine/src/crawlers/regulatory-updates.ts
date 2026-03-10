@@ -11,7 +11,7 @@
  * ~200 credits/month (7 sources × 1 page × 30 days)
  */
 
-import type { Env } from "../types";
+import type { Env, CrawlStatus } from "../types";
 import { simpleFetch, scrapeUrl, extractStructured } from "../utils/browser-scraper";
 import {
   createCrawlJob,
@@ -321,7 +321,8 @@ export async function crawlRegulatoryUpdates(env: Env): Promise<{
 
   // Finalize
   const creditsUsed = REGULATORY_SOURCES.length * 2; // scrape + AI extraction per source
-  const status = urlsFailed > REGULATORY_SOURCES.length * 0.5 ? "partial" : "completed";
+  const status: CrawlStatus =
+    urlsFailed > REGULATORY_SOURCES.length * 0.5 ? "partial" : "completed";
 
   await updateCrawlJob(env.DB, jobId, {
     status,
@@ -342,7 +343,15 @@ export async function crawlRegulatoryUpdates(env: Env): Promise<{
     );
   }
 
-  return { jobId, success: status !== "failed", recordsCreated, highPriorityCount, errors };
+  return {
+    jobId,
+    // `status` is currently computed as completed|partial, but keep the success predicate
+    // future-proof for when the crawler can mark the job as failed.
+    success: status === "completed" || status === "partial",
+    recordsCreated,
+    highPriorityCount,
+    errors,
+  };
 }
 
 // ─── Helpers ───

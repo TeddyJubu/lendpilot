@@ -32,7 +32,7 @@ After credits: ~$5-15/month for Workers + D1 + Browser Rendering.
 ### 1. Install Dependencies
 
 ```bash
-cd mortgage-data-engine
+cd services/mortgage-data-engine
 npm install
 ```
 
