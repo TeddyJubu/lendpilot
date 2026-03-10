@@ -39,6 +39,39 @@ app.use("/api/*", async (c, next) => {
   return next();
 });
 
+// ─── KV Rate Limiting (sliding fixed-window counter) ───
+
+/** Returns false when the caller has exceeded the rate limit for the given key. */
+async function checkRateLimit(
+  kv: KVNamespace,
+  key: string,
+  limit: number,
+  windowSecs: number
+): Promise<boolean> {
+  const window = Math.floor(Math.floor(Date.now() / 1000) / windowSecs);
+  const kvKey = `ratelimit:${key}:${window}`;
+  const current = parseInt((await kv.get(kvKey)) ?? "0", 10);
+  if (current >= limit) return false;
+  await kv.put(kvKey, String(current + 1), { expirationTtl: windowSecs * 2 });
+  return true;
+}
+
+// Enrich endpoint: max 10 req/min per API key
+app.use("/api/enrich", async (c, next) => {
+  const apiKey = c.req.header("X-API-Key") ?? c.req.query("api_key") ?? "anon";
+  const allowed = await checkRateLimit(c.env.CACHE, `enrich:${apiKey}`, 10, 60);
+  if (!allowed) return c.json({ error: "Rate limit exceeded. Max 10 enrichment requests per minute." }, 429);
+  return next();
+});
+
+// Manual crawl trigger: max 5 req/hour (crawls are expensive)
+app.use("/api/crawl/*", async (c, next) => {
+  const apiKey = c.req.header("X-API-Key") ?? c.req.query("api_key") ?? "anon";
+  const allowed = await checkRateLimit(c.env.CACHE, `crawl:${apiKey}`, 5, 3600);
+  if (!allowed) return c.json({ error: "Rate limit exceeded. Max 5 manual crawl triggers per hour." }, 429);
+  return next();
+});
+
 // ─── Health Check ───
 app.get("/api/health", async (c) => {
   const credits = await getCreditsRemaining(c.env.DB);

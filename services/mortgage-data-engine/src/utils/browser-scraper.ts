@@ -14,6 +14,24 @@
 import type { Env } from "../types";
 import { sleep } from "./helpers";
 
+/** Exponential backoff delays (ms) for network-error retries */
+const RETRY_DELAYS = [2_000, 4_000, 8_000];
+
+/**
+ * Retry a scrape function up to RETRY_DELAYS.length additional times.
+ * Only retries on network errors (statusCode === 0). HTTP errors are returned as-is.
+ */
+async function retryOnNetworkError<T extends { statusCode: number }>(
+  fn: () => Promise<T>
+): Promise<T> {
+  let result = await fn();
+  for (let i = 0; i < RETRY_DELAYS.length && result.statusCode === 0; i++) {
+    await sleep(RETRY_DELAYS[i]);
+    result = await fn();
+  }
+  return result;
+}
+
 export interface ScrapeResult {
   url: string;
   html: string;
@@ -37,6 +55,7 @@ export interface ExtractOptions {
  *
  * Uses the Browser Rendering REST API (no puppeteer dependency needed
  * for basic page fetches — puppeteer is available for complex interactions).
+ * Retries up to 3 times on network errors with exponential backoff (2s, 4s, 8s).
  */
 export async function scrapeUrl(
   url: string,
@@ -45,93 +64,92 @@ export async function scrapeUrl(
 ): Promise<ScrapeResult> {
   const timeout = options?.timeout ?? 30_000;
 
-  try {
-    // Cloudflare Browser Rendering REST API endpoint
-    // Docs: https://developers.cloudflare.com/browser-rendering/rest-api/
-    const endpoint = `https://browser-rendering.cloudflare.com/content`;
+  return retryOnNetworkError(async () => {
+    try {
+      // Cloudflare Browser Rendering REST API endpoint
+      // Docs: https://developers.cloudflare.com/browser-rendering/rest-api/
+      const endpoint = `https://browser-rendering.cloudflare.com/content`;
 
-    const response = await env.BROWSER.fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url,
-        // Return both rendered HTML and extracted text
-        rewriteLinksAbsoluteUrl: true,
-        waitUntil: "networkidle0",
-        ...(options?.waitForSelector && {
-          gotoOptions: { waitUntil: "networkidle0", timeout },
+      const response = await env.BROWSER.fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          // Return both rendered HTML and extracted text
+          rewriteLinksAbsoluteUrl: true,
+          waitUntil: "networkidle0",
+          ...(options?.waitForSelector && {
+            gotoOptions: { waitUntil: "networkidle0", timeout },
+          }),
         }),
-      }),
-    });
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        return {
+          url,
+          html: "",
+          text: "",
+          title: "",
+          statusCode: response.status,
+          error: `Browser rendering failed: ${response.status} ${response.statusText}`,
+        };
+      }
+
+      const html = await response.text();
+
+      // Extract text content from HTML (simple extraction)
+      const text = htmlToText(html);
+      const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : "";
+
+      return { url, html, text, title, statusCode: 200 };
+    } catch (error) {
       return {
         url,
         html: "",
         text: "",
         title: "",
-        statusCode: response.status,
-        error: `Browser rendering failed: ${response.status} ${response.statusText}`,
+        statusCode: 0,
+        error: error instanceof Error ? error.message : "Unknown scrape error",
       };
     }
-
-    const html = await response.text();
-
-    // Extract text content from HTML (simple extraction)
-    const text = htmlToText(html);
-    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].trim() : "";
-
-    return {
-      url,
-      html,
-      text,
-      title,
-      statusCode: 200,
-    };
-  } catch (error) {
-    return {
-      url,
-      html: "",
-      text: "",
-      title: "",
-      statusCode: 0,
-      error: error instanceof Error ? error.message : "Unknown scrape error",
-    };
-  }
+  });
 }
 
 /**
  * Scrape a URL using a simple fetch (for sites that don't need JS rendering).
  * Much cheaper — no browser rendering credits used.
+ * Retries up to 3 times on network errors with exponential backoff (2s, 4s, 8s).
  */
 export async function simpleFetch(url: string): Promise<ScrapeResult> {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
+  return retryOnNetworkError(async () => {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      });
 
-    const html = await response.text();
-    const text = htmlToText(html);
-    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].trim() : "";
+      const html = await response.text();
+      const text = htmlToText(html);
+      const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : "";
 
-    return { url, html, text, title, statusCode: response.status };
-  } catch (error) {
-    return {
-      url,
-      html: "",
-      text: "",
-      title: "",
-      statusCode: 0,
-      error: error instanceof Error ? error.message : "Fetch failed",
-    };
-  }
+      return { url, html, text, title, statusCode: response.status };
+    } catch (error) {
+      return {
+        url,
+        html: "",
+        text: "",
+        title: "",
+        statusCode: 0,
+        error: error instanceof Error ? error.message : "Fetch failed",
+      };
+    }
+  });
 }
 
 /**
@@ -193,6 +211,29 @@ export async function extractStructured<T>(
       data: null,
       error: error instanceof Error ? error.message : "Extraction failed",
     };
+  }
+}
+
+/**
+ * Archive raw scraped HTML to R2 for audit trail and historical comparison.
+ * Key format: `crawls/{category}/{YYYY-MM-DD}/{url-slug}.html`
+ */
+export async function archiveToR2(
+  env: Env,
+  category: string,
+  url: string,
+  html: string
+): Promise<void> {
+  try {
+    const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const slug = url.replace(/[^a-z0-9]/gi, "-").slice(0, 80);
+    const key = `crawls/${category}/${date}/${slug}.html`;
+    await env.STORAGE.put(key, html, {
+      httpMetadata: { contentType: "text/html" },
+      customMetadata: { sourceUrl: url, crawledAt: new Date().toISOString() },
+    });
+  } catch {
+    // Archival is best-effort — never block the crawl
   }
 }
 
