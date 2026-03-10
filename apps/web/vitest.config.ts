@@ -13,6 +13,12 @@ import path from "node:path";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  esbuild: {
+    // Next.js uses `jsx: preserve`; for Vitest we need a runtime transform.
+    // Automatic runtime avoids needing `import React` in every TSX module.
+    jsx: "automatic",
+    jsxImportSource: "react",
+  },
   test: {
     environment: "jsdom",
     globals: true,
