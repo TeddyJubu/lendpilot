@@ -20,7 +20,13 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { AIContent } from "@/components/primitives/ai-content";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 
 type CopilotPanelProps = {
@@ -167,6 +173,12 @@ export function CopilotPanel({ contextLabel, open, onOpenChange }: CopilotPanelP
 
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="w-full max-w-[360px] p-0 xl:hidden" side="right">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Copilot panel</SheetTitle>
+            <SheetDescription>
+              Review contextual AI guidance and draft the next shell action.
+            </SheetDescription>
+          </SheetHeader>
           <CopilotPanelBody contextLabel={contextLabel} onOpenChange={onOpenChange} />
         </SheetContent>
       </Sheet>

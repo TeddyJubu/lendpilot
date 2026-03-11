@@ -37,11 +37,18 @@ import { ConfirmDialog } from "@/components/primitives/confirm-dialog";
 
 import { SparklesIcon } from "lucide-react";
 
+const EXAMPLE_TIMEAGO_TIMESTAMP = new Date("2026-03-11T15:49:01.000Z").getTime();
+
 export default function DesignSystemPage() {
   const { theme, setTheme, systemTheme } = useTheme();
-  const resolved = theme === "system" ? systemTheme : theme;
+  const [mounted, setMounted] = React.useState(false);
   const [detailOpen, setDetailOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const resolved = mounted ? (theme === "system" ? systemTheme : theme) : undefined;
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <main className="min-h-screen p-6">
@@ -54,16 +61,16 @@ export default function DesignSystemPage() {
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">Theme: {resolved ?? "unknown"}</Badge>
+            <Badge variant="outline">Theme: {resolved ?? "loading"}</Badge>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setTheme(resolved === "dark" ? "light" : "dark")}
+              disabled={!mounted}
             >
               Toggle theme
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setTheme("system")}
-            >
+            <Button variant="ghost" size="sm" onClick={() => setTheme("system")} disabled={!mounted}>
               System
             </Button>
           </div>
@@ -138,7 +145,7 @@ export default function DesignSystemPage() {
 
                 <div className="flex flex-wrap items-center gap-3">
                   <KeyboardShortcut keys={["Cmd", "K"]} />
-                  <TimeAgo timestamp={Date.now() - 2 * 60 * 60 * 1000} />
+                  <TimeAgo timestamp={EXAMPLE_TIMEAGO_TIMESTAMP} />
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
