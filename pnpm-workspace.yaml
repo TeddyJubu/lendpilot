@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# pnpm security posture: avoid running native build scripts we don't need.
+# (This mirrors the previous apps/web-local config and is intentionally centralized here.)
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver

@@ -1,0 +1,24 @@
+{
+  "name": "loanpilot",
+  "private": true,
+  "scripts": {
+    "web:dev": "pnpm -C apps/web dev",
+    "web:build": "pnpm -C apps/web build",
+    "web:start": "pnpm -C apps/web start",
+    "web:lint": "pnpm -C apps/web lint",
+    "web:typecheck": "pnpm -C apps/web typecheck",
+    "web:test": "pnpm -C apps/web test",
+
+    "convex:dev": "pnpm -C apps/web convex:dev",
+    "convex:deploy": "pnpm -C apps/web convex:deploy",
+    "convex:codegen": "pnpm -C apps/web convex:codegen",
+
+    "worker:dev": "npm --prefix services/mortgage-data-engine run dev",
+    "worker:deploy": "npm --prefix services/mortgage-data-engine run deploy",
+    "worker:typecheck": "npm --prefix services/mortgage-data-engine run typecheck",
+    "worker:test": "npm --prefix services/mortgage-data-engine run --if-present test",
+
+    "typecheck": "pnpm -C apps/web typecheck && npm --prefix services/mortgage-data-engine run typecheck",
+    "test": "pnpm -C apps/web test && npm --prefix services/mortgage-data-engine run --if-present test"
+  }
+}
