@@ -24,6 +24,11 @@ export default defineConfig({
     globals: true,
     passWithNoTests: true,
     setupFiles: ["./src/test/setup.ts"],
+    server: {
+      deps: {
+        inline: ["convex-test"],
+      },
+    },
   },
   resolve: {
     alias: {

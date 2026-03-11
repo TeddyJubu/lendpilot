@@ -1,4 +1,4 @@
-// @vitest-environment node
+// @vitest-environment edge-runtime
 
 /**
  * @organ core
@@ -11,10 +11,11 @@ import { describe, expect, test } from "vitest";
 
 import { api } from "../../_generated/api";
 import schema from "../../schema";
+import { convexModules } from "../../test.setup";
 
 describe("core/mutations.createOrGetUser", () => {
   test("creates a user row for the authenticated identity", async () => {
-    const t = convexTest(schema).withIdentity({ subject: "user_1" });
+    const t = convexTest(schema, convexModules).withIdentity({ subject: "user_1" });
 
     const userId = await t.mutation(api.core.mutations.createOrGetUser, {
       email: "a@example.com",
@@ -31,7 +32,7 @@ describe("core/mutations.createOrGetUser", () => {
   });
 
   test("is idempotent (second call patches the existing row)", async () => {
-    const t = convexTest(schema).withIdentity({ subject: "user_2" });
+    const t = convexTest(schema, convexModules).withIdentity({ subject: "user_2" });
 
     const firstId = await t.mutation(api.core.mutations.createOrGetUser, {
       email: "first@example.com",
@@ -50,7 +51,7 @@ describe("core/mutations.createOrGetUser", () => {
   });
 
   test("rejects unauthenticated calls", async () => {
-    const t = convexTest(schema);
+    const t = convexTest(schema, convexModules);
 
     await expect(
       t.mutation(api.core.mutations.createOrGetUser, {
@@ -61,7 +62,7 @@ describe("core/mutations.createOrGetUser", () => {
   });
 
   test("rejects empty email/name", async () => {
-    const t = convexTest(schema).withIdentity({ subject: "user_3" });
+    const t = convexTest(schema, convexModules).withIdentity({ subject: "user_3" });
 
     await expect(
       t.mutation(api.core.mutations.createOrGetUser, {
