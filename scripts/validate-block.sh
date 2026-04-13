@@ -54,8 +54,8 @@ else
   log_pass "No .collect() without pagination"
 fi
 
-# Check mutations have updatedAt
-MUTATION_FILES=$(find convex/ -name "mutations.ts" -not -path "*__tests__*" -not -path "*node_modules*" 2>/dev/null || true)
+# Check mutations have updatedAt (skip activities — append-only with timestamp)
+MUTATION_FILES=$(find convex/ -name "mutations.ts" -not -path "*__tests__*" -not -path "*node_modules*" -not -path "*activities*" 2>/dev/null || true)
 for f in $MUTATION_FILES; do
   if ! grep -q 'updatedAt' "$f" 2>/dev/null; then
     log_fail "$f: Missing updatedAt in mutations"
