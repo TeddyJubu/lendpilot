@@ -1,12 +1,12 @@
 # LoanPilot — Project Status
 
-> Last updated: 2026-04-13
+> Last updated: 2026-04-13 (overnight build)
 > Active plan: **2-Day MVP Sprint** (see `MVP_PLAN.md`)
-> Current block: **Not started** — Block 1 (Scaffolding + Schema) is next
+> Current block: **Block 8 COMPLETE** — All blocks built and validated
 
 ## Quick Summary
 
-The project has comprehensive planning docs (~100KB) and a partially built Cloudflare Workers intelligence layer (~3,100 lines). The Convex backend and Next.js frontend have not been started. The original 34-week/13-phase plan has been replaced with a **2-day MVP sprint** focusing on the core CRM loop: auth, contacts, loans pipeline, document tracking, and rule-based feed.
+The MVP is built. 8 blocks completed autonomously with a validator agent approving each one. 83 tests pass, TypeScript compiles clean, all anti-pattern checks pass. The app has: Clerk auth, contacts CRUD with search/filter, loans pipeline kanban with state machine enforcement, document tracking, rule-based feed generation (4 rules), and a Today action view.
 
 ---
 
@@ -16,19 +16,19 @@ The project has comprehensive planning docs (~100KB) and a partially built Cloud
 
 | Block | Name | Status | Tests |
 |-------|------|--------|-------|
-| 1 | Scaffolding + Schema | Not Started | — |
-| 2 | Core Organ + Auth | Not Started | 0 tests |
-| 3 | Contacts Organ | Not Started | 0 tests |
-| 4 | Loans + State Machine | Not Started | 0 tests |
+| 1 | Scaffolding + Schema | COMPLETE | 24 (state machine) |
+| 2 | Core Organ + Auth | COMPLETE | +10 (validators, helpers) |
+| 3 | Contacts Organ | COMPLETE | +17 (validators, helpers) |
+| 4 | Loans + State Machine | COMPLETE | +20 (validators, helpers, stage groups) |
 
 ### Day 2: Frontend + Feed + Polish
 
 | Block | Name | Status | Tests |
 |-------|------|--------|-------|
-| 5 | App Shell + Contacts UI | Not Started | manual |
-| 6 | Pipeline Kanban UI | Not Started | manual |
-| 7 | Documents + Feed + Today | Not Started | 0 tests |
-| 8 | Polish + Final Verification | Not Started | full suite |
+| 5 | App Shell + Contacts UI | COMPLETE | manual verification |
+| 6 | Pipeline Kanban UI | COMPLETE | manual verification |
+| 7 | Documents + Feed + Today | COMPLETE | +12 (feed rules) |
+| 8 | Polish + Final Verification | COMPLETE | 83 total, all pass |
 
 ### What's IN the MVP
 Auth (Clerk), Contacts CRUD, Loans CRUD, Pipeline Kanban, Document Tracking, Activity Logging, Today Feed (rule-based), App Shell, Command Bar (navigation only)
