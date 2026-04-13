@@ -2,12 +2,13 @@
 
 > Reviewed: 2026-04-13
 > Documents analyzed: CLAUDE.md, IMPLEMENTATION.md, DESIGN_SYSTEM.md, docs/PRD.md, mortgage-data-engine/ source code
+> **Resolution:** Original 34-week plan replaced with 2-day MVP sprint. See `MVP_PLAN.md`.
 
 ---
 
 ## Executive Summary
 
-LoanPilot's planning documentation is exceptionally detailed — the organ-tissue architecture is clean, gate criteria are specific, and the schema design is comprehensive. However, the plan has significant gaps: missing schemas for team/billing features, undefined algorithms for core AI capabilities, no migration or versioning strategy, and a state machine that references AI capabilities not available until Phase 6. The existing Worker code (~3,100 lines) has zero tests, violating the plan's own TDD mandate. The 34-week, 13-phase timeline risks over-engineering an MVP.
+LoanPilot's planning documentation is architecturally sound — the organ-tissue pattern, gate criteria, and schema design are all high quality. However, the original 34-week/13-phase timeline was over-engineered for an MVP. Critical gaps included missing team/billing schemas, undefined AI algorithms, no migration strategy, and zero tests on 3,100 lines of existing code. The plan has been compressed to a **2-day MVP sprint** (see `MVP_PLAN.md`) that delivers the core CRM loop — auth, contacts, loans pipeline, document tracking, and rule-based feed — with TDD on all business logic. Deferred features (AI, comms, billing, teams) have clear post-MVP timelines.
 
 ---
 
@@ -196,27 +197,33 @@ LOS credentials and AI prompt templates reference Cloudflare KV storage, but no 
 
 ---
 
-## Recommendations Summary
+## Recommendations — Revised for 2-Day MVP
 
-### Before Phase 0.1 (Do Now)
-1. Add vitest + miniflare to `mortgage-data-engine/` and write tests for helpers, queries
-2. Draft team/billing schema (even if implementation is Phase 12)
-3. Create `.github/workflows/ci.yml` skeleton
-4. Create `.env.example` files
+### Resolved by MVP Plan
+- ~~Over-engineering risk~~ -> Compressed to 2-day sprint (`MVP_PLAN.md`)
+- ~~State machine gap~~ -> `new_lead → scored` allowed; broker manually advances. AI scoring added post-MVP
+- ~~No CI/CD~~ -> Deferred to Week 2. MVP uses `pnpm test` + `tsc --noEmit` as local gates
+- ~~Missing algorithm specs~~ -> AI features deferred. Rule-based feed uses 4 simple rules (see Block 7)
+- ~~Email/SMS webhooks~~ -> Cut from MVP entirely. Templates table has schema but no send functions
 
-### During Phase 0.1
-5. Restructure: create `apps/web/`, move Worker to `services/mortgage-data-engine/`
-6. Design Convex HTTP action endpoints for data ingestion (rates, enrichment)
-7. Add husky pre-commit hooks (lint + type-check)
+### Addressed During MVP (Block 1)
+1. Deploy ALL 8 organ schemas upfront — prevents migration pain even for unimplemented organs
+2. Install vitest + convex-test from the start — TDD from Block 2 onward
 
-### Before Phase 2
-8. Clarify how `new_lead → scored` works without AI scoring
+### Deferred to Post-MVP (Week 2)
+3. Worker tests (vitest + miniflare for `mortgage-data-engine/`)
+4. Cloudflare → Convex sync layer
+5. CI/CD pipeline (`.github/workflows/ci.yml`)
+6. `.env.example` files and setup documentation
+7. Move `mortgage-data-engine/` to `services/` directory
 
-### Before Phase 4
-9. Design email/SMS inbound webhook handler architecture
+### Deferred to Post-MVP (Month 2+)
+8. Team/billing schema + implementation
+9. Algorithm specs for AI scoring (lead, health, relationship, rate comparison)
+10. LOS integration, Durable Objects, doc intelligence
+11. API versioning, KV key naming, data retention policy
 
-### Before Phase 5
-10. Write algorithm specs for lead scoring, health scoring, rate comparison, relationship scoring
-
-### Consider for MVP Strategy
-11. Set "Launch MVP" gate after Phase 7; defer Phases 8-10 to post-launch
+### Open Questions for Post-MVP
+- How should `metadata: v.any()` on activities be typed? (union of per-type shapes recommended)
+- What's the rate snapshot retention policy? (suggest 90-day TTL with weekly cleanup cron)
+- When does monorepo restructure happen? (recommend before adding second developer)

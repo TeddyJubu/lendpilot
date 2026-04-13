@@ -1,56 +1,57 @@
 # LoanPilot — Project Status
 
 > Last updated: 2026-04-13
-> Current phase: **Pre-Phase 0 (Planning + Intelligence Layer Scaffolding)**
+> Active plan: **2-Day MVP Sprint** (see `MVP_PLAN.md`)
+> Current block: **Not started** — Block 1 (Scaffolding + Schema) is next
 
 ## Quick Summary
 
-The project has comprehensive planning documentation (~100KB across 4 files) and a partially implemented Cloudflare Workers intelligence layer. The Convex backend and Next.js frontend have not been started. Zero tests exist.
+The project has comprehensive planning docs (~100KB) and a partially built Cloudflare Workers intelligence layer (~3,100 lines). The Convex backend and Next.js frontend have not been started. The original 34-week/13-phase plan has been replaced with a **2-day MVP sprint** focusing on the core CRM loop: auth, contacts, loans pipeline, document tracking, and rule-based feed.
 
 ---
 
-## Phase Completion Matrix
+## 2-Day MVP Progress
 
-### Chapter 1: Foundation
+### Day 1: Foundation + Backend
 
-| Phase | Name | Status | Notes |
+| Block | Name | Status | Tests |
 |-------|------|--------|-------|
-| 0.1 | Project Scaffolding | Not Started | No monorepo, no Next.js, no Convex init |
-| 0.2 | Design System Base | Not Started | Tokens defined in DESIGN_SYSTEM.md, not in code |
-| 0.3 | App Shell + Auth | Not Started | No Clerk, no users table, no shell |
+| 1 | Scaffolding + Schema | Not Started | — |
+| 2 | Core Organ + Auth | Not Started | 0 tests |
+| 3 | Contacts Organ | Not Started | 0 tests |
+| 4 | Loans + State Machine | Not Started | 0 tests |
 
-### Chapter 2: Core CRM
+### Day 2: Frontend + Feed + Polish
 
-| Phase | Name | Status | Notes |
+| Block | Name | Status | Tests |
 |-------|------|--------|-------|
-| 1 | Contacts Organ | Not Started | Schema designed in CLAUDE.md only |
-| 2 | Loans + Pipeline | Not Started | State machine designed, not coded |
-| 3 | Documents | Not Started | |
-| 4 | Templates + Comms | Not Started | |
+| 5 | App Shell + Contacts UI | Not Started | manual |
+| 6 | Pipeline Kanban UI | Not Started | manual |
+| 7 | Documents + Feed + Today | Not Started | 0 tests |
+| 8 | Polish + Final Verification | Not Started | full suite |
 
-### Chapter 3: Intelligence Layer
+### What's IN the MVP
+Auth (Clerk), Contacts CRUD, Loans CRUD, Pipeline Kanban, Document Tracking, Activity Logging, Today Feed (rule-based), App Shell, Command Bar (navigation only)
 
-| Phase | Name | Status | Notes |
-|-------|------|--------|-------|
-| 5 | Feed (Rule-Based) | Not Started | |
-| 6 | AI Integration | Not Started | ai-gateway, copilot, scoring not built |
-| 7 | Enrichment Live | Partial (~40%) | Crawlers built, no Convex sync |
+### What's OUT (Post-MVP)
+Cloudflare sync, AI copilot, Lead/health scoring, Email/SMS sending, File upload, Rate display, LOS integration, Billing, Teams, Onboarding flow, Dark mode, Relationship map
 
-### Chapter 4: Advanced
+---
 
-| Phase | Name | Status | Notes |
-|-------|------|--------|-------|
-| 8 | Doc Intelligence | Not Started | |
-| 9 | Refi Monitor | Not Started | |
-| 10 | LOS Integration | Not Started | |
+## Pre-Existing Code
 
-### Chapter 5: Launch
+### Cloudflare Workers — `mortgage-data-engine/` (standalone, no changes in MVP)
 
-| Phase | Name | Status | Notes |
-|-------|------|--------|-------|
-| 11 | Onboarding | Not Started | |
-| 12 | Billing + Team | Not Started | Schema not designed |
-| 13 | Production Hardening | Not Started | |
+| Component | Status |
+|-----------|--------|
+| Wholesale rate crawler | Built (241 lines) |
+| Retail rate crawler | Built (206 lines) |
+| DPA program crawler | Built (338 lines) |
+| Regulatory update crawler | Built (359 lines) |
+| Lead enrichment | Built (384 lines) |
+| Hono API (15 endpoints) | Built (472 lines) |
+| D1 schema + seed data | Built (186 lines) |
+| Tests | None — deferred to post-MVP |
 
 ---
 
@@ -123,9 +124,6 @@ The project has comprehensive planning documentation (~100KB across 4 files) and
 
 ---
 
-## Immediate Next Steps
+## Immediate Next Step
 
-1. **Phase 0.1** — Scaffold monorepo: create `apps/web/` (Next.js 15 + Convex), move `mortgage-data-engine/` to `services/`
-2. **Add tests** — vitest + miniflare for existing Worker crawlers (unblocks gate compliance)
-3. **Phase 0.2** — Implement design tokens in Tailwind config + shadcn primitives
-4. **Phase 0.3** — Clerk auth, core/users organ, app shell with 3 views
+**Start Block 1 of MVP_PLAN.md** — scaffold `apps/web/` with Next.js 15 + Convex, deploy all 8 organ schemas, install shadcn + Clerk. See `MVP_PLAN.md` for full task breakdown.
