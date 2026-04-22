@@ -14,7 +14,10 @@
 
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
-import { createLoanArgs, updateLoanArgs, updateStageArgs, archiveLoanArgs } from "./validators";
+import {
+  createLoanArgs, updateLoanArgs, updateStageArgs, archiveLoanArgs,
+  isValidFico, isValidLtv, isValidDti, isValidLoanAmount, isValidRate,
+} from "./validators";
 import { canTransition } from "./stateMachine";
 
 /**
@@ -37,6 +40,11 @@ export const create = mutation({
     if (!contact || contact.ownerId !== user._id) {
       throw new Error("Contact not found");
     }
+
+    if (args.loanAmount !== undefined && !isValidLoanAmount(args.loanAmount)) throw new Error("Invalid loan amount");
+    if (args.fico !== undefined && !isValidFico(args.fico)) throw new Error("Invalid FICO score");
+    if (args.ltv !== undefined && !isValidLtv(args.ltv)) throw new Error("Invalid LTV");
+    if (args.dti !== undefined && !isValidDti(args.dti)) throw new Error("Invalid DTI");
 
     const now = Date.now();
 
@@ -92,11 +100,18 @@ export const update = mutation({
     if (!user) throw new Error("User not found");
 
     const loan = await ctx.db.get(args.loanId);
-    if (!loan || loan.ownerId !== user._id) {
+    if (!loan || loan.ownerId !== user._id || loan.isArchived) {
       throw new Error("Loan not found");
     }
 
-    const updates: Record<string, unknown> = { updatedAt: Date.now() };
+    if (args.loanAmount !== undefined && !isValidLoanAmount(args.loanAmount)) throw new Error("Invalid loan amount");
+    if (args.fico !== undefined && !isValidFico(args.fico)) throw new Error("Invalid FICO score");
+    if (args.ltv !== undefined && !isValidLtv(args.ltv)) throw new Error("Invalid LTV");
+    if (args.dti !== undefined && !isValidDti(args.dti)) throw new Error("Invalid DTI");
+    if (args.lockedRate !== undefined && !isValidRate(args.lockedRate)) throw new Error("Invalid locked rate");
+
+    const now = Date.now();
+    const updates: Record<string, unknown> = { updatedAt: now };
     if (args.loanAmount !== undefined) updates.loanAmount = args.loanAmount;
     if (args.propertyAddress !== undefined) updates.propertyAddress = args.propertyAddress;
     if (args.propertyType !== undefined) updates.propertyType = args.propertyType;
@@ -112,6 +127,17 @@ export const update = mutation({
     if (args.loanValue !== undefined) updates.loanValue = args.loanValue;
 
     await ctx.db.patch(args.loanId, updates);
+
+    await ctx.db.insert("activities", {
+      loanId: args.loanId,
+      contactId: loan.contactId,
+      ownerId: user._id,
+      type: "system",
+      subject: "Loan updated",
+      isAiGenerated: false,
+      timestamp: now,
+    });
+
     return args.loanId;
   },
 });
@@ -135,6 +161,10 @@ export const updateStage = mutation({
 
     const loan = await ctx.db.get(args.loanId);
     if (!loan || loan.ownerId !== user._id) {
+      throw new Error("Loan not found");
+    }
+
+    if (loan.isArchived) {
       throw new Error("Loan not found");
     }
 

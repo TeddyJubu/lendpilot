@@ -93,6 +93,17 @@ export const update = mutation({
     if (args.nextTouchDue !== undefined) updates.nextTouchDue = args.nextTouchDue;
 
     await ctx.db.patch(args.contactId, updates);
+
+    await ctx.db.insert("activities", {
+      contactId: args.contactId,
+      ownerId: user._id,
+      type: "system" as const,
+      subject: "Contact updated",
+      body: `${contact.firstName} ${contact.lastName} updated`,
+      isAiGenerated: false,
+      timestamp: Date.now(),
+    });
+
     return args.contactId;
   },
 });

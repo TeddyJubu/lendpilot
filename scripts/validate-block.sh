@@ -35,10 +35,9 @@ fi
 
 # ─── 2. All tests pass ───
 echo "Running tests..."
-TEST_OUTPUT=$(pnpm exec vitest run 2>&1) || true
-if echo "$TEST_OUTPUT" | grep -q "Tests.*passed"; then
-  PASSED=$(echo "$TEST_OUTPUT" | grep -oP 'Tests\s+\K\d+(?=\s+passed)')
-  TOTAL_FILES=$(echo "$TEST_OUTPUT" | grep -oP 'Test Files\s+\K\d+(?=\s+passed)')
+if TEST_OUTPUT=$(pnpm exec vitest run 2>&1); then
+  PASSED=$(echo "$TEST_OUTPUT" | grep -oP 'Tests\s+\K\d+(?=\s+passed)' || true)
+  TOTAL_FILES=$(echo "$TEST_OUTPUT" | grep -oP 'Test Files\s+\K\d+(?=\s+passed)' || true)
   log_pass "All tests pass ($PASSED tests across $TOTAL_FILES files)"
 else
   log_fail "Tests failed"

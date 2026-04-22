@@ -54,12 +54,10 @@ export const listOverdue = query({
     const docs = await ctx.db
       .query("documents")
       .withIndex("by_due", (q: any) =>
-        q.eq("ownerId", user._id).eq("status", "requested")
+        q.eq("ownerId", user._id).eq("status", "requested").lt("dueDate", now)
       )
       .take(100);
 
-    return docs.filter(
-      (d: any) => !d.isArchived && d.dueDate && d.dueDate < now
-    );
+    return docs.filter((d: any) => !d.isArchived);
   },
 });

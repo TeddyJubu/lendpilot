@@ -28,10 +28,16 @@ export const addNote = mutation({
       .unique();
     if (!user) throw new Error("User not found");
 
-    // Verify contact belongs to this user
     const contact = await ctx.db.get(args.contactId);
     if (!contact || contact.ownerId !== user._id) {
       throw new Error("Contact not found");
+    }
+
+    if (args.loanId) {
+      const loan = await ctx.db.get(args.loanId);
+      if (!loan || loan.ownerId !== user._id || loan.contactId !== args.contactId) {
+        throw new Error("Loan not found");
+      }
     }
 
     return await ctx.db.insert("activities", {

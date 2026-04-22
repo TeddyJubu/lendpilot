@@ -51,6 +51,15 @@ export const create = mutation({
       .unique();
     if (!user) throw new Error("User not found");
 
+    if (args.loanId) {
+      const loan = await ctx.db.get(args.loanId);
+      if (!loan || loan.ownerId !== user._id) throw new Error("Loan not found");
+    }
+    if (args.contactId) {
+      const contact = await ctx.db.get(args.contactId);
+      if (!contact || contact.ownerId !== user._id) throw new Error("Contact not found");
+    }
+
     return await ctx.db.insert("feedItems", {
       ownerId: user._id,
       type: args.type,
@@ -65,6 +74,8 @@ export const create = mutation({
       status: "active",
       updatedAt: Date.now(),
     });
+
+    return args.feedItemId;
   },
 });
 
@@ -93,6 +104,8 @@ export const complete = mutation({
       completedAt: Date.now(),
       updatedAt: Date.now(),
     });
+
+    return args.feedItemId;
   },
 });
 
@@ -120,6 +133,8 @@ export const dismiss = mutation({
       status: "dismissed",
       updatedAt: Date.now(),
     });
+
+    return args.feedItemId;
   },
 });
 
@@ -151,5 +166,7 @@ export const snooze = mutation({
       snoozedUntil: Date.now() + args.snoozeDurationMs,
       updatedAt: Date.now(),
     });
+
+    return args.feedItemId;
   },
 });

@@ -29,8 +29,17 @@ export function LoanCard({ loan, onClick }: LoanCardProps) {
 
   return (
     <Card
-      className="p-3 cursor-pointer hover:shadow-md transition-shadow"
+      role="button"
+      tabIndex={0}
+      aria-label="Open loan details"
+      className="p-3 cursor-pointer hover:shadow-md transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
     >
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">

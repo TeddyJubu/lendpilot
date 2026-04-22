@@ -28,10 +28,14 @@ export const requestDoc = mutation({
       .unique();
     if (!user) throw new Error("User not found");
 
-    // Verify loan belongs to user
     const loan = await ctx.db.get(args.loanId);
     if (!loan || loan.ownerId !== user._id) {
       throw new Error("Loan not found");
+    }
+
+    const contact = await ctx.db.get(args.contactId);
+    if (!contact || contact.ownerId !== user._id) {
+      throw new Error("Contact not found");
     }
 
     const now = Date.now();
@@ -128,9 +132,21 @@ export const updateStatus = mutation({
       throw new Error("Document not found");
     }
 
+    const now = Date.now();
+
     await ctx.db.patch(args.documentId, {
       status: args.status,
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("activities", {
+      loanId: doc.loanId,
+      contactId: doc.contactId,
+      ownerId: user._id,
+      type: "system",
+      subject: `Document ${args.status}: ${doc.name}`,
+      isAiGenerated: false,
+      timestamp: now,
     });
 
     return args.documentId;
