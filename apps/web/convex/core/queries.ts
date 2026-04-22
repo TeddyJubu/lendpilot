@@ -31,12 +31,22 @@ export const getCurrentUser = query({
 });
 
 /**
- * Get a user by their Convex document ID.
- * Used for displaying user info (e.g., owner name on a contact).
+ * Get a user's public profile by ID. Requires authentication.
+ * Returns only safe public fields (name, company).
  */
 export const getUserById = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.userId);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db.get(args.userId);
+    if (!user) return null;
+
+    return {
+      _id: user._id,
+      name: user.name,
+      companyName: user.companyName,
+    };
   },
 });

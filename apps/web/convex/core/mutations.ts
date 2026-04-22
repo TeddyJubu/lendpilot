@@ -16,23 +16,26 @@ import { createUserArgs, updateUserArgs } from "./validators";
  * or return the existing one. Called on every sign-in.
  */
 export const createOrGetUser = mutation({
-  args: createUserArgs,
+  args: { name: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    // Check if user already exists by clerkId
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const clerkId = identity.subject;
+
     const existing = await ctx.db
       .query("users")
-      .withIndex("by_clerk", (q: any) => q.eq("clerkId", args.clerkId))
+      .withIndex("by_clerk", (q: any) => q.eq("clerkId", clerkId))
       .unique();
 
     if (existing) {
       return existing._id;
     }
 
-    // Create new user with trial tier
     const userId = await ctx.db.insert("users", {
-      clerkId: args.clerkId,
-      email: args.email,
-      name: args.name,
+      clerkId,
+      email: identity.email ?? "",
+      name: args.name ?? identity.name ?? "User",
       tier: "trial",
       onboardingCompleted: false,
       updatedAt: Date.now(),

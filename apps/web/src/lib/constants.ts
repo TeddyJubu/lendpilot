@@ -1,29 +1,4 @@
-import type { LoanStage, StageGroup } from "../../convex/types";
-
-/** Map a loan stage to its kanban stage group */
-export function getStageGroup(stage: LoanStage): StageGroup {
-  switch (stage) {
-    case "new_lead":
-    case "scored":
-    case "contacted":
-      return "intake";
-    case "pre_qualified":
-    case "application_filed":
-    case "docs_collecting":
-      return "qualification";
-    case "submitted_to_lender":
-    case "in_underwriting":
-    case "conditions":
-    case "clear_to_close":
-      return "processing";
-    case "closing_scheduled":
-    case "funded":
-      return "closing";
-    case "withdrawn":
-    case "denied":
-      return "terminal";
-  }
-}
+export { getStageGroup } from "../../convex/loans/helpers";
 
 /** Calculate days since a timestamp */
 export function daysAgo(timestamp: number): number {

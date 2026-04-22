@@ -8,7 +8,9 @@
 set -e
 
 BLOCK_NAME="${1:-unknown}"
-WEB_DIR="/home/user/lendpilot/apps/web"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WEB_DIR="${WEB_DIR:-$REPO_ROOT/apps/web}"
 REPORT=""
 FAILURES=0
 

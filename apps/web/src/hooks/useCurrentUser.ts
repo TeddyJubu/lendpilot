@@ -17,9 +17,7 @@ export function useCurrentUser() {
   useEffect(() => {
     if (isClerkLoaded && clerkUser && convexUser === null) {
       createOrGetUser({
-        clerkId: clerkUser.id,
-        email: clerkUser.primaryEmailAddress?.emailAddress ?? "",
-        name: clerkUser.fullName ?? clerkUser.firstName ?? "User",
+        name: clerkUser.fullName ?? clerkUser.firstName ?? undefined,
       });
     }
   }, [isClerkLoaded, clerkUser, convexUser, createOrGetUser]);

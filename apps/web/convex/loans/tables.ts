@@ -93,6 +93,7 @@ export const loans = defineTable({
   updatedAt: v.number(),
 })
   .index("by_owner_stage", ["ownerId", "stage", "isArchived"])
+  .index("by_owner_active", ["ownerId", "isArchived"])
   .index("by_contact", ["contactId"])
   .index("by_stage_entered", ["ownerId", "stage", "stageEnteredAt"])
   .index("by_health", ["ownerId", "healthScore"])

@@ -11,6 +11,7 @@ import { v } from "convex/values";
 
 /**
  * List activities for a contact, most recent first.
+ * Verifies the contact belongs to the authenticated user.
  */
 export const listByContact = query({
   args: {
@@ -20,6 +21,15 @@ export const listByContact = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk", (q: any) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return [];
+
+    const contact = await ctx.db.get(args.contactId);
+    if (!contact || contact.ownerId !== user._id) return [];
 
     const limit = args.limit ?? 50;
 
@@ -35,6 +45,7 @@ export const listByContact = query({
 
 /**
  * List activities for a loan, most recent first.
+ * Verifies the loan belongs to the authenticated user.
  */
 export const listByLoan = query({
   args: {
@@ -44,6 +55,15 @@ export const listByLoan = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk", (q: any) => q.eq("clerkId", identity.subject))
+      .unique();
+    if (!user) return [];
+
+    const loan = await ctx.db.get(args.loanId);
+    if (!loan || loan.ownerId !== user._id) return [];
 
     const limit = args.limit ?? 50;
 

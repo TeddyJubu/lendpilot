@@ -84,7 +84,7 @@ export function FeedCard({ item }: FeedCardProps) {
             variant="ghost"
             size="sm"
             onClick={handleComplete}
-            title="Mark as done"
+            aria-label="Mark as done"
           >
             <Check className="h-4 w-4" />
           </Button>
@@ -92,7 +92,7 @@ export function FeedCard({ item }: FeedCardProps) {
             variant="ghost"
             size="sm"
             onClick={handleSnooze}
-            title="Snooze 24h"
+            aria-label="Snooze 24 hours"
           >
             <Clock className="h-4 w-4" />
           </Button>
@@ -100,7 +100,7 @@ export function FeedCard({ item }: FeedCardProps) {
             variant="ghost"
             size="sm"
             onClick={handleDismiss}
-            title="Dismiss"
+            aria-label="Dismiss"
           >
             <X className="h-4 w-4" />
           </Button>

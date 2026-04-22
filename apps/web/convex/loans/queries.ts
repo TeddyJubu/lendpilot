@@ -25,15 +25,14 @@ export const listForPipeline = query({
       .unique();
     if (!user) return [];
 
-    // Get all non-archived, non-terminal loans
     const loans = await ctx.db
       .query("loans")
-      .withIndex("by_owner_stage", (q: any) =>
-        q.eq("ownerId", user._id)
+      .withIndex("by_owner_active", (q: any) =>
+        q.eq("ownerId", user._id).eq("isArchived", false)
       )
       .take(500);
 
-    return loans.filter((l: any) => !l.isArchived);
+    return loans;
   },
 });
 
