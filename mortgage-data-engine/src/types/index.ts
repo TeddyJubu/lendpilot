@@ -12,6 +12,9 @@ export interface Env {
   ALERT_WEBHOOK_URL: string;
   ADMIN_API_KEY: string;
   BROKER_WEBHOOK_SECRET: string;
+  // Web-agent service (Node.js, deployed separately)
+  FIRECRAWL_AGENT_URL: string;
+  FIRECRAWL_AGENT_API_KEY: string;
 }
 
 // ============================================
@@ -32,10 +35,55 @@ export type IncomeBracket = "under_50k" | "50k_100k" | "100k_150k" | "150k_250k"
 
 export type CrawlCategory =
   | "wholesale_rates" | "retail_rates" | "lead_enrichment"
-  | "dpa_programs" | "regulatory" | "realtor_profiles";
+  | "dpa_programs" | "regulatory" | "realtor_profiles"
+  | "agent_lender_discovery" | "agent_regulatory_scan";
 
 export type CrawlStatus = "queued" | "running" | "completed" | "failed" | "partial";
 export type CrawlTrigger = "scheduled" | "on_demand" | "manual";
+
+// ============================================
+// Web-Agent Integration Types
+// ============================================
+
+export type AgentTaskType = "lender_discovery" | "regulatory_scan";
+export type AgentTaskStatus = "queued" | "running" | "completed" | "failed";
+
+export interface DiscoveredLender {
+  name: string;
+  type: "wholesale" | "retail" | "credit_union" | "online";
+  tpo_portal_url?: string;
+  nmls_id?: string;
+  requires_auth: boolean;
+  confidence_score: number;
+  discovery_notes?: string;
+}
+
+export interface AgentRegulatoryFinding {
+  title: string;
+  source: string;
+  document_type: string;
+  summary: string;
+  published_date: string;
+  effective_date?: string;
+  affects_loan_types: string[];
+  affects_states: string[];
+  url?: string;
+  relevance_score: number;
+  broker_impact: string;
+}
+
+export interface AgentIngestLendersBody {
+  lenders: DiscoveredLender[];
+  task_id: string;
+  sources_checked: string[];
+}
+
+export interface AgentIngestRegulatoryBody {
+  findings: AgentRegulatoryFinding[];
+  task_id: string;
+  sources_checked: string[];
+  total_sources_scanned: number;
+}
 
 // ============================================
 // Category 1: Wholesale Rates

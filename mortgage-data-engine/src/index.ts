@@ -2,11 +2,13 @@
  * Mortgage Data Engine — Main Worker Entry Point
  *
  * Architecture: Cloudflare Workers + D1 + Browser Rendering + Workers AI
- * Replaces Firecrawl with self-hosted scraping on Cloudflare's platform.
+ * Intelligence layer: Cloudflare handles fast/scheduled scraping;
+ * web-agent service (Node.js) handles autonomous research tasks.
  *
  * Handles:
  * - HTTP API requests (via Hono router)
- * - Cron-triggered scheduled crawls
+ * - Cron-triggered scheduled crawls (Workers AI scrapers)
+ * - Cron-triggered agent tasks (calls web-agent service)
  * - Webhook-triggered lead enrichment
  */
 
@@ -88,10 +90,80 @@ export default {
       ctx.waitUntil(runWithAlerts(env, "dpa_programs", crawlDPAPrograms(env)));
     }
 
-    // Future P2 triggers:
-    // if (hour === 12 && dayOfWeek === 3) { /* realtor profiles */ }
+    // Wednesday at 12 UTC (8 AM ET): Agent lender discovery (P2)
+    // Autonomous scan for new TPO portals via web-agent service.
+    if (hour === 12 && dayOfWeek === 3) {
+      ctx.waitUntil(runWithAlerts(env, "agent_lender_discovery", callAgentTask(env, "lender-discovery")));
+    }
+
+    // Thursday at 12 UTC (8 AM ET): Agent regulatory scan (P2)
+    // Supplements the daily structured crawler with autonomous deep research.
+    if (hour === 12 && dayOfWeek === 4) {
+      ctx.waitUntil(runWithAlerts(env, "agent_regulatory_scan", callAgentTask(env, "regulatory-scan")));
+    }
   },
 };
+
+/**
+ * Call a task on the web-agent service (Node.js) and return a summary result.
+ *
+ * The agent service handles the actual research and posts results back to this
+ * Worker via POST /api/agent/ingest-*. This function just fires the task and
+ * waits for the HTTP response (which arrives after the agent completes).
+ *
+ * Timeout: 25 minutes — agent tasks can take 2-4 minutes; CF Workers can await
+ * up to 30 minutes in scheduled handlers via waitUntil.
+ */
+async function callAgentTask(
+  env: Env,
+  task: "lender-discovery" | "regulatory-scan"
+): Promise<{ success: boolean; errors: string[]; recordsCreated: number }> {
+  if (!env.FIRECRAWL_AGENT_URL) {
+    return {
+      success: false,
+      errors: ["FIRECRAWL_AGENT_URL not configured — web-agent integration disabled"],
+      recordsCreated: 0,
+    };
+  }
+
+  const url = `${env.FIRECRAWL_AGENT_URL.replace(/\/$/, "")}/v1/run/${task}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.FIRECRAWL_AGENT_API_KEY}`,
+      },
+      body: JSON.stringify({ triggered_by: "cron" }),
+      // CF fetch timeout — scheduled handlers get 15 minutes by default
+      signal: AbortSignal.timeout(14 * 60 * 1000),
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => response.statusText);
+      return {
+        success: false,
+        errors: [`Agent service returned ${response.status}: ${text}`],
+        recordsCreated: 0,
+      };
+    }
+
+    const result = await response.json() as {
+      lenders_ingested?: number;
+      findings_ingested?: number;
+      errors?: string[];
+    };
+
+    const recordsCreated = result.lenders_ingested ?? result.findings_ingested ?? 0;
+    const errors = result.errors ?? [];
+
+    return { success: errors.length === 0, errors, recordsCreated };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, errors: [msg], recordsCreated: 0 };
+  }
+}
 
 /**
  * Handle CRM webhook for new lead enrichment.
