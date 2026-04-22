@@ -2,11 +2,13 @@
  * Mortgage Data Engine — Main Worker Entry Point
  *
  * Architecture: Cloudflare Workers + D1 + Browser Rendering + Workers AI
- * Replaces Firecrawl with self-hosted scraping on Cloudflare's platform.
+ * Intelligence layer: Cloudflare handles fast/scheduled scraping;
+ * web-agent service (Node.js) handles autonomous research tasks.
  *
  * Handles:
  * - HTTP API requests (via Hono router)
- * - Cron-triggered scheduled crawls
+ * - Cron-triggered scheduled crawls (Workers AI scrapers)
+ * - Cron-triggered agent tasks (calls web-agent service)
  * - Webhook-triggered lead enrichment
  */
 
@@ -43,11 +45,12 @@ export default {
    * Cron trigger handler — scheduled crawls
    *
    * Cron schedule (from wrangler.toml):
-   * - Every 4h: Wholesale rates
-   * - Daily 6AM ET: Retail rates
-   * - Daily 7AM ET: Regulatory updates (P1)
-   * - Weekly Mon: DPA programs (P1)
-   * - Weekly Wed: Realtor profiles (future P2)
+   * - Every 4h UTC: Wholesale rates
+   * - Daily 10 UTC: Retail rates
+   * - Daily 11 UTC: Regulatory updates (P1)
+   * - Weekly Mon 12 UTC: DPA programs (P1)
+   * - Weekly Wed 12 UTC: Agent lender discovery (P2)
+   * - Weekly Thu 12 UTC: Agent regulatory scan (P2)
    */
   async scheduled(
     event: ScheduledEvent,
@@ -88,10 +91,85 @@ export default {
       ctx.waitUntil(runWithAlerts(env, "dpa_programs", crawlDPAPrograms(env)));
     }
 
-    // Future P2 triggers:
-    // if (hour === 12 && dayOfWeek === 3) { /* realtor profiles */ }
+    // Wednesday at 12 UTC (8 AM ET): Agent lender discovery (P2)
+    // Autonomous scan for new TPO portals via web-agent service.
+    if (hour === 12 && dayOfWeek === 3) {
+      ctx.waitUntil(runWithAlerts(env, "agent_lender_discovery", callAgentTask(env, "lender-discovery")));
+    }
+
+    // Thursday at 12 UTC (8 AM ET): Agent regulatory scan (P2)
+    // Supplements the daily structured crawler with autonomous deep research.
+    if (hour === 12 && dayOfWeek === 4) {
+      ctx.waitUntil(runWithAlerts(env, "agent_regulatory_scan", callAgentTask(env, "regulatory-scan")));
+    }
   },
 };
+
+/**
+ * Call a task on the web-agent service (Node.js) and return a summary result.
+ *
+ * The agent service handles the actual research and posts results back to this
+ * Worker via POST /api/agent/ingest-*. This function just fires the task and
+ * waits for the HTTP response (which arrives after the agent completes).
+ *
+ * Timeout: 14 minutes — agent tasks can take 2-4 minutes; CF Workers can await
+ * up to 15 minutes in scheduled handlers via waitUntil.
+ */
+async function callAgentTask(
+  env: Env,
+  task: "lender-discovery" | "regulatory-scan"
+): Promise<{ success: boolean; errors: string[]; recordsCreated: number }> {
+  if (!env.FIRECRAWL_AGENT_URL || !env.FIRECRAWL_AGENT_API_KEY) {
+    return {
+      success: false,
+      errors: ["FIRECRAWL_AGENT_URL or FIRECRAWL_AGENT_API_KEY not configured — web-agent integration disabled"],
+      recordsCreated: 0,
+    };
+  }
+
+  const url = `${env.FIRECRAWL_AGENT_URL.replace(/\/$/, "")}/v1/run/${task}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.FIRECRAWL_AGENT_API_KEY}`,
+      },
+      body: JSON.stringify({ triggered_by: "cron" }),
+      // CF fetch timeout — scheduled handlers get 15 minutes by default
+      signal: AbortSignal.timeout(14 * 60 * 1000),
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => response.statusText);
+      return {
+        success: false,
+        errors: [`Agent service returned ${response.status}: ${text}`],
+        recordsCreated: 0,
+      };
+    }
+
+    const raw = await response.json();
+    const result = (typeof raw === "object" && raw !== null ? raw : {}) as {
+      lenders_ingested?: unknown;
+      findings_ingested?: unknown;
+      errors?: unknown;
+    };
+
+    const lendersIngested = typeof result.lenders_ingested === "number" ? result.lenders_ingested : 0;
+    const findingsIngested = typeof result.findings_ingested === "number" ? result.findings_ingested : 0;
+    const recordsCreated = lendersIngested + findingsIngested;
+    const errors = Array.isArray(result.errors)
+      ? result.errors.filter((e): e is string => typeof e === "string")
+      : [];
+
+    return { success: errors.length === 0, errors, recordsCreated };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, errors: [msg], recordsCreated: 0 };
+  }
+}
 
 /**
  * Handle CRM webhook for new lead enrichment.

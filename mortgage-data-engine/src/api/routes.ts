@@ -13,11 +13,23 @@
  * - GET  /api/dpa/programs        — List all active DPA programs by state
  * - GET  /api/regulatory/feed     — Recent regulatory updates feed
  * - GET  /api/regulatory/alerts   — High-priority regulatory alerts
+ * - GET  /api/regulatory/impact   — Impact check for a specific loan type
+ * - POST /api/agent/ingest-lenders      — Web-agent posts discovered lenders
+ * - POST /api/agent/ingest-regulatory   — Web-agent posts regulatory findings
+ * - GET  /api/agent/discovered-lenders  — List lenders pending review
+ * - PATCH /api/agent/discovered-lenders/:id — Approve or reject a discovered lender
+ * - GET  /api/agent/tasks               — List agent task history
  * - GET  /api/health              — Health check
  */
 
 import { Hono } from "hono";
-import type { Env, RateQuery, EnrichmentRequest } from "../types";
+import type {
+  Env,
+  RateQuery,
+  EnrichmentRequest,
+  AgentIngestLendersBody,
+  AgentIngestRegulatoryBody,
+} from "../types";
 import { queryBestWholesaleRates, getCreditsRemaining } from "../db/queries";
 import { enrichLead } from "../crawlers/lead-enrichment";
 import { crawlWholesaleRates } from "../crawlers/wholesale-rates";
@@ -431,6 +443,309 @@ app.get("/api/jobs", async (c) => {
   const results = await c.env.DB.prepare(sql).bind(...params).all();
   return c.json({ jobs: results.results });
 });
+
+// ═══════════════════════════════════════
+// P2: Web-Agent Integration Endpoints
+// ═══════════════════════════════════════
+
+// ─── Ingest: Discovered Lenders (posted by web-agent service) ───
+app.post("/api/agent/ingest-lenders", async (c) => {
+  const body = await c.req.json<AgentIngestLendersBody>();
+
+  if (!body.task_id || !Array.isArray(body.lenders)) {
+    return c.json({ error: "task_id and lenders[] are required" }, 400);
+  }
+
+  let created = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const lender of body.lenders) {
+    if (!lender.name || typeof lender.confidence_score !== "number") {
+      errors.push(`Skipping invalid lender entry: missing name or confidence_score`);
+      skipped++;
+      continue;
+    }
+
+    try {
+      // Check for duplicate by name (case-insensitive)
+      const existing = await c.env.DB
+        .prepare(`SELECT id FROM discovered_lenders WHERE LOWER(name) = LOWER(?) LIMIT 1`)
+        .bind(lender.name)
+        .first();
+
+      if (existing) {
+        skipped++;
+        continue;
+      }
+
+      // Also skip if already in the main lenders table
+      const inRegistry = await c.env.DB
+        .prepare(`SELECT id FROM lenders WHERE LOWER(name) = LOWER(?) LIMIT 1`)
+        .bind(lender.name)
+        .first();
+
+      if (inRegistry) {
+        skipped++;
+        continue;
+      }
+
+      await c.env.DB
+        .prepare(
+          `INSERT INTO discovered_lenders
+           (id, name, type, tpo_portal_url, nmls_id, requires_auth, confidence_score,
+            discovery_notes, review_status, agent_task_id, discovered_at)
+           VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, 'pending', ?, datetime('now'))`
+        )
+        .bind(
+          lender.name,
+          lender.type ?? "wholesale",
+          lender.tpo_portal_url ?? null,
+          lender.nmls_id ?? null,
+          lender.requires_auth ? 1 : 0,
+          lender.confidence_score,
+          lender.discovery_notes ?? null,
+          body.task_id
+        )
+        .run();
+
+      created++;
+    } catch (err) {
+      console.error(`Failed to stage lender "${lender.name}":`, err);
+      errors.push(`Failed to stage ${lender.name} — database error`);
+    }
+  }
+
+  // Record task completion with actual created count (after deduplication)
+  await c.env.DB
+    .prepare(
+      `INSERT INTO agent_tasks (id, task_type, status, triggered_by, records_created, completed_at, created_at)
+       VALUES (?, 'lender_discovery', 'completed', 'scheduled', ?, datetime('now'), datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET
+         status = 'completed', records_created = excluded.records_created, completed_at = excluded.completed_at`
+    )
+    .bind(body.task_id, created)
+    .run();
+
+  return c.json({ success: true, records_created: created, records_skipped: skipped, errors });
+});
+
+// ─── Ingest: Agent Regulatory Findings (posted by web-agent service) ───
+app.post("/api/agent/ingest-regulatory", async (c) => {
+  const body = await c.req.json<AgentIngestRegulatoryBody>();
+
+  if (!body.task_id || !Array.isArray(body.findings)) {
+    return c.json({ error: "task_id and findings[] are required" }, 400);
+  }
+
+  let created = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const finding of body.findings) {
+    if (!finding.title || !finding.published_date || !finding.source) {
+      errors.push(`Skipping invalid finding: missing title, source, or published_date`);
+      skipped++;
+      continue;
+    }
+
+    try {
+      // Deduplicate by source + title + published_date (unique index)
+      const result = await c.env.DB
+        .prepare(
+          `INSERT OR IGNORE INTO agent_regulatory_findings
+           (id, source, document_type, title, summary, published_date, effective_date,
+            affects_loan_types, affects_states, url, relevance_score, broker_impact,
+            review_status, agent_task_id, discovered_at)
+           VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, datetime('now'))`
+        )
+        .bind(
+          finding.source,
+          finding.document_type,
+          finding.title,
+          finding.summary ?? null,
+          finding.published_date,
+          finding.effective_date ?? null,
+          JSON.stringify(finding.affects_loan_types ?? []),
+          JSON.stringify(finding.affects_states ?? []),
+          finding.url ?? null,
+          finding.relevance_score,
+          finding.broker_impact ?? null,
+          body.task_id
+        )
+        .run();
+
+      if (result.meta.changes > 0) {
+        created++;
+        // Auto-promote high-relevance items (score >= 8) to regulatory_updates
+        if (finding.relevance_score >= 8) {
+          const promoted = await promoteToRegulatoryUpdates(c.env.DB, finding);
+          if (promoted) {
+            await c.env.DB
+              .prepare(
+                `UPDATE agent_regulatory_findings SET review_status = 'promoted'
+                 WHERE source = ? AND title = ? AND published_date = ?`
+              )
+              .bind(finding.source, finding.title, finding.published_date)
+              .run();
+          }
+        }
+      } else {
+        skipped++;
+      }
+    } catch (err) {
+      console.error(`Failed to stage finding "${finding.title}":`, err);
+      errors.push(`Failed to stage "${finding.title}" — database error`);
+    }
+  }
+
+  // Record task completion with actual created count (after deduplication)
+  await c.env.DB
+    .prepare(
+      `INSERT INTO agent_tasks (id, task_type, status, triggered_by, records_created, completed_at, created_at)
+       VALUES (?, 'regulatory_scan', 'completed', 'scheduled', ?, datetime('now'), datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET
+         status = 'completed', records_created = excluded.records_created, completed_at = excluded.completed_at`
+    )
+    .bind(body.task_id, created)
+    .run();
+
+  return c.json({ success: true, records_created: created, records_skipped: skipped, errors });
+});
+
+// ─── List: Discovered Lenders Pending Review ───
+app.get("/api/agent/discovered-lenders", async (c) => {
+  const status = c.req.query("status") ?? "pending";
+  const limit = c.req.query("limit") ? parseInt(c.req.query("limit")!) : 50;
+
+  const results = await c.env.DB
+    .prepare(
+      `SELECT * FROM discovered_lenders WHERE review_status = ? ORDER BY confidence_score DESC LIMIT ?`
+    )
+    .bind(status, limit)
+    .all();
+
+  return c.json({ count: results.results.length, lenders: results.results });
+});
+
+// ─── Review: Approve or Reject a Discovered Lender ───
+app.patch("/api/agent/discovered-lenders/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json<{ action: "approve" | "reject" }>();
+
+  if (!body.action || !["approve", "reject"].includes(body.action)) {
+    return c.json({ error: "action must be 'approve' or 'reject'" }, 400);
+  }
+
+  const lender = await c.env.DB
+    .prepare(`SELECT * FROM discovered_lenders WHERE id = ?`)
+    .bind(id)
+    .first<{
+      id: string; name: string; type: string; tpo_portal_url: string | null;
+      nmls_id: string | null; requires_auth: number; confidence_score: number;
+    }>();
+
+  if (!lender) {
+    return c.json({ error: "Lender not found" }, 404);
+  }
+
+  // On approval: promote to lenders table FIRST, then mark approved only if insert succeeded
+  if (body.action === "approve") {
+    const lenderId = `lender_${lender.name.toLowerCase().replace(/[^a-z0-9]/g, "_").slice(0, 30)}`;
+    const crawlConfig = JSON.stringify({
+      requires_auth: lender.requires_auth === 1,
+      rate_sheet_url_pattern: lender.tpo_portal_url ?? "",
+      extraction_prompt: "Extract all mortgage rate offerings",
+      crawl_priority: 3,
+    });
+
+    await c.env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO lenders (id, name, type, tpo_portal_url, nmls_id, is_active, crawl_config, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 1, ?, datetime('now'), datetime('now'))`
+      )
+      .bind(lenderId, lender.name, lender.type, lender.tpo_portal_url, lender.nmls_id, crawlConfig)
+      .run();
+
+    await c.env.DB
+      .prepare(`UPDATE discovered_lenders SET review_status = 'approved', reviewed_at = datetime('now') WHERE id = ?`)
+      .bind(id)
+      .run();
+
+    return c.json({ success: true, id, status: "approved", promoted_to_registry: true });
+  } else {
+    await c.env.DB
+      .prepare(`UPDATE discovered_lenders SET review_status = 'rejected', reviewed_at = datetime('now') WHERE id = ?`)
+      .bind(id)
+      .run();
+
+    return c.json({ success: true, id, status: "rejected", promoted_to_registry: false });
+  }
+});
+
+// ─── List: Agent Task History ───
+app.get("/api/agent/tasks", async (c) => {
+  const taskType = c.req.query("type");
+  const limit = c.req.query("limit") ? parseInt(c.req.query("limit")!) : 20;
+
+  let sql = `SELECT * FROM agent_tasks WHERE 1=1`;
+  const params: unknown[] = [];
+
+  if (taskType) {
+    sql += ` AND task_type = ?`;
+    params.push(taskType);
+  }
+
+  sql += ` ORDER BY created_at DESC LIMIT ?`;
+  params.push(limit);
+
+  const results = await c.env.DB.prepare(sql).bind(...params).all();
+  return c.json({ tasks: results.results });
+});
+
+// ─── Helper: Promote agent finding to regulatory_updates ───
+// Returns true if the row was inserted (false if it already existed).
+async function promoteToRegulatoryUpdates(
+  db: D1Database,
+  finding: {
+    source: string; document_type: string; title: string; summary?: string;
+    published_date: string; effective_date?: string; affects_loan_types: string[];
+    affects_states: string[]; url?: string; relevance_score: number; broker_impact?: string;
+  }
+): Promise<boolean> {
+  // Check if already in regulatory_updates
+  const exists = await db
+    .prepare(`SELECT id FROM regulatory_updates WHERE source = ? AND title = ? AND published_date = ?`)
+    .bind(finding.source, finding.title, finding.published_date)
+    .first();
+
+  if (exists) return false;
+
+  await db
+    .prepare(
+      `INSERT INTO regulatory_updates
+       (id, source, document_type, title, summary, full_text, effective_date, published_date,
+        affects_loan_types, affects_states, url, relevance_score, broker_impact, crawl_job_id, crawled_at)
+       VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'))`
+    )
+    .bind(
+      finding.source,
+      finding.document_type,
+      finding.title,
+      finding.summary ?? null,
+      finding.summary ?? null,
+      finding.effective_date ?? null,
+      finding.published_date,
+      JSON.stringify(finding.affects_loan_types),
+      JSON.stringify(finding.affects_states),
+      finding.url ?? null,
+      finding.relevance_score,
+      finding.broker_impact ?? null
+    )
+    .run();
+
+  return true;
+}
 
 // ─── Credit Balance ───
 app.get("/api/credits", async (c) => {

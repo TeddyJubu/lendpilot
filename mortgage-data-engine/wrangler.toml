@@ -30,11 +30,12 @@ id = "YOUR_KV_NAMESPACE_ID"  # Run: wrangler kv namespace create CACHE
 # ─── Cron Triggers (scheduling) ───
 [triggers]
 crons = [
-  "0 2,6,10,14,18,22 * * *",   # Wholesale rates — every 4 hours
-  "0 10 * * *",                  # Retail rates — daily 6 AM ET (10 UTC)
-  "0 11 * * *",                  # Regulatory updates — daily 7 AM ET
-  "0 12 * * 1",                  # DPA programs — Mondays (future P1)
-  "0 12 * * 3"                   # Realtor profiles — Wednesdays (future P2)
+  "0 2,6,10,14,18,22 * * *",   # Wholesale rates — every 4 hours UTC
+  "0 10 * * *",                  # Retail rates — daily 10:00 UTC
+  "0 11 * * *",                  # Regulatory updates (structured crawler) — daily 11:00 UTC
+  "0 12 * * 1",                  # DPA programs — Mondays 12:00 UTC
+  "0 12 * * 3",                  # Agent: lender discovery — Wednesdays 12:00 UTC
+  "0 12 * * 4"                   # Agent: regulatory deep scan — Thursdays 12:00 UTC
 ]
 
 # ─── Environment Variables ───
@@ -42,7 +43,9 @@ crons = [
 ENVIRONMENT = "production"
 CREDIT_BUDGET_MONTHLY = "13350"
 ALERT_WEBHOOK_URL = ""  # Slack/Discord webhook for alerts
+FIRECRAWL_AGENT_URL = ""  # URL of deployed web-agent service (e.g. https://lendpilot-agent.vercel.app)
 
 # ─── Secrets (set via: wrangler secret put SECRET_NAME) ───
-# ADMIN_API_KEY — for manual trigger endpoints
-# BROKER_WEBHOOK_SECRET — for CRM lead.created webhooks
+# ADMIN_API_KEY          — for manual trigger endpoints
+# BROKER_WEBHOOK_SECRET  — for CRM lead.created webhooks
+# FIRECRAWL_AGENT_API_KEY — shared secret between Worker and web-agent service
