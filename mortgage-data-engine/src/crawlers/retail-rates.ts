@@ -16,8 +16,10 @@ import {
   insertRetailRate,
   logCredits,
   getCreditsRemaining,
+  getRatesForJob,
 } from "../db/queries";
 import { isValidRate, sleep } from "../utils/helpers";
+import { rateRowToWire, syncRatesToConvex } from "../sync/convex-sync";
 
 const RETAIL_EXTRACTION_SCHEMA = {
   type: "object",
@@ -201,6 +203,23 @@ export async function crawlRetailRates(env: Env): Promise<{
   });
 
   await logCredits(env.DB, jobId, "retail_rates", creditsUsed);
+
+  // Sync freshly-written rates back to Convex (non-fatal on failure).
+  if (recordsCreated > 0) {
+    const rows = await getRatesForJob(env.DB, jobId, "retail");
+    const wire = rows
+      .map((row) => rateRowToWire(row, String(row.lender_name ?? ""), "retail"))
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    const syncResult = await syncRatesToConvex(env, wire, {
+      source: "retail_rates",
+      errors: errors.slice(0, 10),
+    });
+    if (!syncResult.success) {
+      errors.push(
+        `Convex sync: ${syncResult.errors.join("; ") || "failed"}`
+      );
+    }
+  }
 
   return { jobId, success: true, recordsCreated, errors };
 }

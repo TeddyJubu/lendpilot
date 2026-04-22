@@ -1,8 +1,8 @@
 # LoanPilot — Project Status
 
-> Last updated: 2026-04-13 (overnight build)
+> Last updated: 2026-04-22
 > Active plan: **2-Day MVP Sprint** (see `MVP_PLAN.md`)
-> Current block: **Block 8 COMPLETE** — All blocks built and validated
+> Current block: **Block 8 COMPLETE** + data-engine sync layer landed
 
 ## Quick Summary
 
@@ -40,18 +40,20 @@ Cloudflare sync, AI copilot, Lead/health scoring, Email/SMS sending, File upload
 
 ## Pre-Existing Code
 
-### Cloudflare Workers — `mortgage-data-engine/` (standalone, no changes in MVP)
+### Cloudflare Workers — `mortgage-data-engine/`
 
 | Component | Status |
 |-----------|--------|
-| Wholesale rate crawler | Built (241 lines) |
-| Retail rate crawler | Built (206 lines) |
-| DPA program crawler | Built (338 lines) |
-| Regulatory update crawler | Built (359 lines) |
-| Lead enrichment | Built (384 lines) |
+| Wholesale rate crawler | Built + Convex sync wired |
+| Retail rate crawler | Built + Convex sync wired |
+| DPA program crawler | Built (D1-only, surfaced via Hono) |
+| Regulatory update crawler | Built (D1-only, surfaced via Hono) |
+| Lead enrichment | Built + Convex sync (when caller passes IDs) |
+| Convex sync layer | `src/sync/convex-sync.ts` — batching, retry, auth |
 | Hono API (15 endpoints) | Built (472 lines) |
 | D1 schema + seed data | Built (186 lines) |
-| Tests | None — deferred to post-MVP |
+| Tests | **35 passing** (helpers, sync, browser-scraper) |
+| `type-check` + `test` npm scripts | Added |
 
 ---
 
@@ -105,9 +107,11 @@ Cloudflare sync, AI copilot, Lead/health scoring, Email/SMS sending, File upload
 ## Structural Issues
 
 1. **Monorepo mismatch** — Docs specify `apps/web/` + `services/mortgage-data-engine/` but actual structure is flat with `mortgage-data-engine/` at root
-2. **Zero tests** — CLAUDE.md mandates tests for every tissue; none exist for the ~3,100 lines of Worker code
-3. **No Convex→Worker sync** — Crawlers write to D1 but nothing syncs data back to Convex (the designated source of truth for the frontend)
-4. **Missing npm scripts** — No `test`, `lint`, or `type-check` scripts in `mortgage-data-engine/package.json`
+2. ~~Zero tests~~ — Worker now has 35 Vitest tests (helpers, sync, scraper). Full crawler integration tests still deferred.
+3. ~~No Convex→Worker sync~~ — Sync layer landed (`src/sync/convex-sync.ts`); rates + enrichment crawlers push to Convex HTTP actions after each run
+4. ~~Missing npm scripts~~ — `test`, `test:watch`, `type-check` added to worker `package.json`
+5. **D1 + KV still placeholders** — `wrangler.toml` has `YOUR_D1_DATABASE_ID` / `YOUR_KV_NAMESPACE_ID`; blocks deploy until real IDs set
+6. **Secrets not set** — `CONVEX_INGESTION_SECRET`, `CONVEX_URL`, `ADMIN_API_KEY`, `BROKER_WEBHOOK_SECRET` all need `wrangler secret put` before first deploy
 
 ---
 

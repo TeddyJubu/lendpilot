@@ -19,6 +19,10 @@ import {
   logCredits,
 } from "../db/queries";
 import { normalizeAddress, isValidPropertyValue, addHours, addDays, now } from "../utils/helpers";
+import {
+  syncContactEnrichmentToConvex,
+  syncPropertyEnrichmentToConvex,
+} from "../sync/convex-sync";
 
 // ─── Extraction Schemas ───
 
@@ -373,6 +377,37 @@ Generate a brief lead summary for the broker.`,
   });
 
   await logCredits(env.DB, jobId, "lead_enrichment", creditsUsed);
+
+  // Push enrichment back to Convex if the caller provided IDs.
+  // Missing IDs means the worker was invoked without a CRM context,
+  // in which case the D1 cache is the only destination.
+  if (propertyData && request.convex_loan_id) {
+    const result = await syncPropertyEnrichmentToConvex(env, {
+      loanId: request.convex_loan_id,
+      estimatedValue: propertyData.estimated_value ?? undefined,
+      lastSalePrice: propertyData.last_sold_price ?? undefined,
+      bedrooms: propertyData.bedrooms ?? undefined,
+      bathrooms: propertyData.bathrooms ?? undefined,
+      sqft: propertyData.sqft ?? undefined,
+      yearBuilt: propertyData.year_built ?? undefined,
+      taxAnnual: propertyData.tax_annual ?? undefined,
+    });
+    if (!result.success) {
+      errors.push(`Convex property sync: ${result.errors.join("; ")}`);
+    }
+  }
+  if (personData && request.convex_contact_id) {
+    const result = await syncContactEnrichmentToConvex(env, {
+      contactId: request.convex_contact_id,
+      jobTitle: personData.job_title ?? undefined,
+      employer: personData.employer ?? undefined,
+      estimatedIncomeBracket: personData.estimated_income_bracket ?? undefined,
+      linkedinUrl: request.linkedin_url,
+    });
+    if (!result.success) {
+      errors.push(`Convex contact sync: ${result.errors.join("; ")}`);
+    }
+  }
 
   return {
     jobId,

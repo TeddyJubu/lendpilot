@@ -42,7 +42,9 @@ crons = [
 ENVIRONMENT = "production"
 CREDIT_BUDGET_MONTHLY = "13350"
 ALERT_WEBHOOK_URL = ""  # Slack/Discord webhook for alerts
+CONVEX_URL = ""         # Convex HTTP-actions URL, e.g. https://<deployment>.convex.site
 
 # ─── Secrets (set via: wrangler secret put SECRET_NAME) ───
-# ADMIN_API_KEY — for manual trigger endpoints
-# BROKER_WEBHOOK_SECRET — for CRM lead.created webhooks
+# ADMIN_API_KEY           — for manual trigger endpoints
+# BROKER_WEBHOOK_SECRET   — for CRM lead.created webhooks
+# CONVEX_INGESTION_SECRET — Bearer token for the Convex /ingest* actions

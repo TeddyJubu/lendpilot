@@ -12,6 +12,12 @@ export interface Env {
   ALERT_WEBHOOK_URL: string;
   ADMIN_API_KEY: string;
   BROKER_WEBHOOK_SECRET: string;
+  // Convex sync — the worker writes ingested records back to Convex
+  // via HTTP actions so the frontend has a single real-time source.
+  // CONVEX_URL is the deployment URL (e.g. https://<name>.convex.site).
+  // CONVEX_INGESTION_SECRET is the shared Bearer token.
+  CONVEX_URL: string;
+  CONVEX_INGESTION_SECRET: string;
 }
 
 // ============================================
@@ -197,4 +203,10 @@ export interface EnrichmentRequest {
   full_name: string;
   property_address?: string;
   linkedin_url?: string;
+  // Convex IDs — if present, the worker pushes the resulting enrichment
+  // back to Convex (contacts.enrichment / loans.propertyEnrichment).
+  // Optional because some callers (Hono API tests) may only want the
+  // D1-side cache refreshed.
+  convex_contact_id?: string;
+  convex_loan_id?: string;
 }

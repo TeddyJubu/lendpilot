@@ -8,7 +8,7 @@
  * ~250 credits/month (55 sites × ~2 pages × 4 weeks)
  */
 
-import type { Env } from "../types";
+import type { CrawlStatus, Env } from "../types";
 import { simpleFetch, scrapeUrl, extractStructured } from "../utils/browser-scraper";
 import {
   createCrawlJob,
@@ -320,7 +320,9 @@ export async function crawlDPAPrograms(env: Env): Promise<{
 
   // Finalize
   const creditsUsed = DPA_SOURCES.length;
-  const status = urlsFailed > DPA_SOURCES.length * 0.3 ? "partial" : "completed";
+  const status = (urlsFailed > DPA_SOURCES.length * 0.3
+    ? "partial"
+    : "completed") as CrawlStatus;
 
   await updateCrawlJob(env.DB, jobId, {
     status,

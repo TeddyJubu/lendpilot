@@ -276,6 +276,26 @@ export async function upsertPropertyEnrichment(
     .run();
 }
 
+// ─── Read back rates emitted by a specific crawl job (for Convex sync) ───
+
+export async function getRatesForJob(
+  db: D1Database,
+  jobId: string,
+  source: "wholesale" | "retail"
+): Promise<Array<Record<string, any>>> {
+  const table = source === "wholesale" ? "wholesale_rates" : "retail_rates";
+  const result = await db
+    .prepare(
+      `SELECT r.*, l.name AS lender_name
+       FROM ${table} r
+       JOIN lenders l ON r.lender_id = l.id
+       WHERE r.crawl_job_id = ?`
+    )
+    .bind(jobId)
+    .all();
+  return result.results as Array<Record<string, any>>;
+}
+
 // ─── Query: Best wholesale rate for borrower profile ───
 
 export async function queryBestWholesaleRates(

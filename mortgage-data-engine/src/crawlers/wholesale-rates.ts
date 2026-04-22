@@ -12,7 +12,7 @@
  * 5. Track credits and report results
  */
 
-import type { Env } from "../types";
+import type { CrawlStatus, Env } from "../types";
 import { scrapeUrl, simpleFetch, extractStructured } from "../utils/browser-scraper";
 import {
   createCrawlJob,
@@ -21,8 +21,10 @@ import {
   insertWholesaleRate,
   logCredits,
   getCreditsRemaining,
+  getRatesForJob,
 } from "../db/queries";
 import { isValidRate, isValidApr, isValidFico, sleep } from "../utils/helpers";
+import { rateRowToWire, syncRatesToConvex } from "../sync/convex-sync";
 
 /** The extraction schema for wholesale rates — sent to Workers AI */
 const WHOLESALE_EXTRACTION_SCHEMA = {
@@ -219,12 +221,11 @@ export async function crawlWholesaleRates(env: Env): Promise<{
 
   // 5. Finalize job
   const creditsUsed = lenders.length; // 1 credit per lender (approximate)
-  const status =
-    urlsFailed === 0
-      ? "completed"
-      : urlsFailed > lenders.length * 0.2
-        ? "partial"
-        : "completed";
+  const status = (urlsFailed === 0
+    ? "completed"
+    : urlsFailed > lenders.length * 0.2
+      ? "partial"
+      : "completed") as CrawlStatus;
 
   await updateCrawlJob(env.DB, jobId, {
     status,
@@ -236,6 +237,27 @@ export async function crawlWholesaleRates(env: Env): Promise<{
   });
 
   await logCredits(env.DB, jobId, "wholesale_rates", creditsUsed);
+
+  // Sync freshly-written rates back to Convex so the frontend sees them.
+  // Sync failure does not fail the crawl — D1 is authoritative, a later
+  // sync attempt can reconcile.
+  if (recordsCreated > 0) {
+    const rows = await getRatesForJob(env.DB, jobId, "wholesale");
+    const wire = rows
+      .map((row) =>
+        rateRowToWire(row, String(row.lender_name ?? ""), "wholesale")
+      )
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    const syncResult = await syncRatesToConvex(env, wire, {
+      source: "wholesale_rates",
+      errors: errors.slice(0, 10),
+    });
+    if (!syncResult.success) {
+      errors.push(
+        `Convex sync: ${syncResult.errors.join("; ") || "failed"}`
+      );
+    }
+  }
 
   return { jobId, success: status !== "failed", recordsCreated, errors };
 }
