@@ -3,7 +3,7 @@
 // ============================================
 export interface Env {
   DB: D1Database;
-  STORAGE: R2Bucket;
+  STORAGE?: R2Bucket; // optional — enable R2 in CF dashboard before use
   BROWSER: Fetcher; // Cloudflare Browser Rendering
   AI: Ai;
   CACHE: KVNamespace;

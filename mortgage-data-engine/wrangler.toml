@@ -7,12 +7,14 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "mortgage-data-engine"
-database_id = "YOUR_D1_DATABASE_ID"  # Run: wrangler d1 create mortgage-data-engine
+database_id = "369c503f-7c82-4b08-a520-e09bde5269f6"
 
 # ─── R2 Storage (rate sheet archives, crawl logs) ───
-[[r2_buckets]]
-binding = "STORAGE"
-bucket_name = "mortgage-data-storage"
+# Requires R2 to be enabled in Cloudflare Dashboard first.
+# Uncomment when ready:
+# [[r2_buckets]]
+# binding = "STORAGE"
+# bucket_name = "mortgage-data-storage"
 
 # ─── Browser Rendering (replaces Firecrawl) ───
 [browser]
@@ -25,7 +27,7 @@ binding = "AI"
 # ─── KV Namespace (caching, rate limiting) ───
 [[kv_namespaces]]
 binding = "CACHE"
-id = "YOUR_KV_NAMESPACE_ID"  # Run: wrangler kv namespace create CACHE
+id = "889539b6dae14e45af688841a86925ea"
 
 # ─── Cron Triggers (scheduling) ───
 [triggers]
@@ -42,7 +44,8 @@ crons = [
 ENVIRONMENT = "production"
 CREDIT_BUDGET_MONTHLY = "13350"
 ALERT_WEBHOOK_URL = ""  # Slack/Discord webhook for alerts
-CONVEX_URL = ""         # Convex HTTP-actions URL, e.g. https://<deployment>.convex.site
+# HTTP actions endpoint — note .convex.site (not .convex.cloud)
+CONVEX_URL = "https://fortunate-echidna-59.convex.site"
 
 # ─── Secrets (set via: wrangler secret put SECRET_NAME) ───
 # ADMIN_API_KEY           — for manual trigger endpoints
