@@ -29,21 +29,20 @@ app.use((_req, res, next) => {
 });
 
 // ─── Request ID ───
-app.use((req, _res, next) => {
-  (req as any).id = req.headers["x-request-id"] ?? randomUUID();
+app.use((_req, res, next) => {
+  res.locals["requestId"] = _req.headers["x-request-id"] ?? randomUUID();
   next();
 });
 
 // ─── Auth middleware for all /v1/* routes ───
-const AGENT_API_KEY = process.env.LENDPILOT_AGENT_API_KEY;
+const AGENT_API_KEY = process.env.LENDPILOT_AGENT_API_KEY?.trim();
 
-app.use("/v1", (req: Request, res: Response, next: NextFunction) => {
-  const auth = req.headers.authorization;
+app.use("/v1", (_req: Request, res: Response, next: NextFunction) => {
   if (!AGENT_API_KEY) {
-    // No key configured — allow in dev, warn loudly
-    console.warn("[WARN] LENDPILOT_AGENT_API_KEY not set — running without auth");
-    return next();
+    res.status(503).json({ error: "Service unavailable: authentication not configured" });
+    return;
   }
+  const auth = _req.headers.authorization;
   if (!auth || auth !== `Bearer ${AGENT_API_KEY}`) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -108,12 +107,11 @@ app.get("/v1/skills", (_req, res) => {
 });
 
 // ─── Task: Lender Discovery ───
-app.post("/v1/run/lender-discovery", async (req: Request, res: Response) => {
-  const task_id = (req as any).id as string;
+app.post("/v1/run/lender-discovery", async (_req: Request, res: Response) => {
+  const task_id = res.locals["requestId"] as string;
 
   console.log(`[lender-discovery] Starting task ${task_id}`);
 
-  // Run async — caller can poll /v1/tasks/:id for result (future) or wait
   try {
     const result = await runLenderDiscovery(task_id);
     console.log(
@@ -121,15 +119,14 @@ app.post("/v1/run/lender-discovery", async (req: Request, res: Response) => {
     );
     res.json({ task_id, ...result });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[lender-discovery] Fatal: ${msg}`);
-    res.status(500).json({ task_id, error: msg });
+    console.error(`[lender-discovery] Fatal:`, err);
+    res.status(500).json({ task_id, error: "Task failed unexpectedly" });
   }
 });
 
 // ─── Task: Regulatory Scan ───
-app.post("/v1/run/regulatory-scan", async (req: Request, res: Response) => {
-  const task_id = (req as any).id as string;
+app.post("/v1/run/regulatory-scan", async (_req: Request, res: Response) => {
+  const task_id = res.locals["requestId"] as string;
 
   console.log(`[regulatory-scan] Starting task ${task_id}`);
 
@@ -140,21 +137,19 @@ app.post("/v1/run/regulatory-scan", async (req: Request, res: Response) => {
     );
     res.json({ task_id, ...result });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[regulatory-scan] Fatal: ${msg}`);
-    res.status(500).json({ task_id, error: msg });
+    console.error(`[regulatory-scan] Fatal:`, err);
+    res.status(500).json({ task_id, error: "Task failed unexpectedly" });
   }
 });
 
 // ─── Error handler ───
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const msg =
-    err instanceof SyntaxError
-      ? "Invalid JSON body"
-      : err instanceof Error
-        ? err.message
-        : "Internal server error";
-  res.status(500).json({ error: msg });
+  if (err instanceof SyntaxError) {
+    res.status(400).json({ error: "Invalid JSON body" });
+  } else {
+    console.error("[web-agent] Unhandled error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // ─── Start ───

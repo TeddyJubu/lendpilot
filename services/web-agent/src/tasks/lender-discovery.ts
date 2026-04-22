@@ -83,9 +83,9 @@ export async function runLenderDiscovery(
     };
   }
 
-  // Filter by confidence threshold before sending to Worker
+  // Filter: wholesale only (skill target) and above confidence threshold
   const qualifiedLenders: DiscoveredLender[] = agentOutput.discovered_lenders
-    .filter((l) => l.confidence_score >= 0.5)
+    .filter((l) => l.type === "wholesale" && l.confidence_score >= 0.5)
     .map((l) => ({
       name: l.name,
       type: l.type,

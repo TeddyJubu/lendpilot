@@ -456,17 +456,6 @@ app.post("/api/agent/ingest-lenders", async (c) => {
     return c.json({ error: "task_id and lenders[] are required" }, 400);
   }
 
-  // Upsert agent_tasks record to mark this task completed
-  await c.env.DB
-    .prepare(
-      `INSERT INTO agent_tasks (id, task_type, status, triggered_by, records_created, completed_at, created_at)
-       VALUES (?, 'lender_discovery', 'completed', 'scheduled', ?, datetime('now'), datetime('now'))
-       ON CONFLICT(id) DO UPDATE SET
-         status = 'completed', records_created = excluded.records_created, completed_at = excluded.completed_at`
-    )
-    .bind(body.task_id, body.lenders.length)
-    .run();
-
   let created = 0;
   let skipped = 0;
   const errors: string[] = [];
@@ -522,10 +511,21 @@ app.post("/api/agent/ingest-lenders", async (c) => {
 
       created++;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      errors.push(`Failed to insert ${lender.name}: ${msg}`);
+      console.error(`Failed to stage lender "${lender.name}":`, err);
+      errors.push(`Failed to stage ${lender.name} — database error`);
     }
   }
+
+  // Record task completion with actual created count (after deduplication)
+  await c.env.DB
+    .prepare(
+      `INSERT INTO agent_tasks (id, task_type, status, triggered_by, records_created, completed_at, created_at)
+       VALUES (?, 'lender_discovery', 'completed', 'scheduled', ?, datetime('now'), datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET
+         status = 'completed', records_created = excluded.records_created, completed_at = excluded.completed_at`
+    )
+    .bind(body.task_id, created)
+    .run();
 
   return c.json({ success: true, records_created: created, records_skipped: skipped, errors });
 });
@@ -537,16 +537,6 @@ app.post("/api/agent/ingest-regulatory", async (c) => {
   if (!body.task_id || !Array.isArray(body.findings)) {
     return c.json({ error: "task_id and findings[] are required" }, 400);
   }
-
-  await c.env.DB
-    .prepare(
-      `INSERT INTO agent_tasks (id, task_type, status, triggered_by, records_created, completed_at, created_at)
-       VALUES (?, 'regulatory_scan', 'completed', 'scheduled', ?, datetime('now'), datetime('now'))
-       ON CONFLICT(id) DO UPDATE SET
-         status = 'completed', records_created = excluded.records_created, completed_at = excluded.completed_at`
-    )
-    .bind(body.task_id, body.findings.length)
-    .run();
 
   let created = 0;
   let skipped = 0;
@@ -589,16 +579,36 @@ app.post("/api/agent/ingest-regulatory", async (c) => {
         created++;
         // Auto-promote high-relevance items (score >= 8) to regulatory_updates
         if (finding.relevance_score >= 8) {
-          await promoteToRegulatoryUpdates(c.env.DB, finding, body.task_id);
+          const promoted = await promoteToRegulatoryUpdates(c.env.DB, finding);
+          if (promoted) {
+            await c.env.DB
+              .prepare(
+                `UPDATE agent_regulatory_findings SET review_status = 'promoted'
+                 WHERE source = ? AND title = ? AND published_date = ?`
+              )
+              .bind(finding.source, finding.title, finding.published_date)
+              .run();
+          }
         }
       } else {
         skipped++;
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      errors.push(`Failed to insert "${finding.title}": ${msg}`);
+      console.error(`Failed to stage finding "${finding.title}":`, err);
+      errors.push(`Failed to stage "${finding.title}" — database error`);
     }
   }
+
+  // Record task completion with actual created count (after deduplication)
+  await c.env.DB
+    .prepare(
+      `INSERT INTO agent_tasks (id, task_type, status, triggered_by, records_created, completed_at, created_at)
+       VALUES (?, 'regulatory_scan', 'completed', 'scheduled', ?, datetime('now'), datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET
+         status = 'completed', records_created = excluded.records_created, completed_at = excluded.completed_at`
+    )
+    .bind(body.task_id, created)
+    .run();
 
   return c.json({ success: true, records_created: created, records_skipped: skipped, errors });
 });
@@ -639,16 +649,7 @@ app.patch("/api/agent/discovered-lenders/:id", async (c) => {
     return c.json({ error: "Lender not found" }, 404);
   }
 
-  const newStatus = body.action === "approve" ? "approved" : "rejected";
-
-  await c.env.DB
-    .prepare(
-      `UPDATE discovered_lenders SET review_status = ?, reviewed_at = datetime('now') WHERE id = ?`
-    )
-    .bind(newStatus, id)
-    .run();
-
-  // On approval: promote to the main lenders table so the rate scraper picks it up
+  // On approval: promote to lenders table FIRST, then mark approved only if insert succeeded
   if (body.action === "approve") {
     const lenderId = `lender_${lender.name.toLowerCase().replace(/[^a-z0-9]/g, "_").slice(0, 30)}`;
     const crawlConfig = JSON.stringify({
@@ -665,9 +666,21 @@ app.patch("/api/agent/discovered-lenders/:id", async (c) => {
       )
       .bind(lenderId, lender.name, lender.type, lender.tpo_portal_url, lender.nmls_id, crawlConfig)
       .run();
-  }
 
-  return c.json({ success: true, id, status: newStatus, promoted_to_registry: body.action === "approve" });
+    await c.env.DB
+      .prepare(`UPDATE discovered_lenders SET review_status = 'approved', reviewed_at = datetime('now') WHERE id = ?`)
+      .bind(id)
+      .run();
+
+    return c.json({ success: true, id, status: "approved", promoted_to_registry: true });
+  } else {
+    await c.env.DB
+      .prepare(`UPDATE discovered_lenders SET review_status = 'rejected', reviewed_at = datetime('now') WHERE id = ?`)
+      .bind(id)
+      .run();
+
+    return c.json({ success: true, id, status: "rejected", promoted_to_registry: false });
+  }
 });
 
 // ─── List: Agent Task History ───
@@ -691,29 +704,29 @@ app.get("/api/agent/tasks", async (c) => {
 });
 
 // ─── Helper: Promote agent finding to regulatory_updates ───
+// Returns true if the row was inserted (false if it already existed).
 async function promoteToRegulatoryUpdates(
   db: D1Database,
   finding: {
     source: string; document_type: string; title: string; summary?: string;
     published_date: string; effective_date?: string; affects_loan_types: string[];
     affects_states: string[]; url?: string; relevance_score: number; broker_impact?: string;
-  },
-  taskId: string
-): Promise<void> {
+  }
+): Promise<boolean> {
   // Check if already in regulatory_updates
   const exists = await db
     .prepare(`SELECT id FROM regulatory_updates WHERE source = ? AND title = ? AND published_date = ?`)
     .bind(finding.source, finding.title, finding.published_date)
     .first();
 
-  if (exists) return;
+  if (exists) return false;
 
   await db
     .prepare(
       `INSERT INTO regulatory_updates
        (id, source, document_type, title, summary, full_text, effective_date, published_date,
         affects_loan_types, affects_states, url, relevance_score, broker_impact, crawl_job_id, crawled_at)
-       VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+       VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'))`
     )
     .bind(
       finding.source,
@@ -727,10 +740,11 @@ async function promoteToRegulatoryUpdates(
       JSON.stringify(finding.affects_states),
       finding.url ?? null,
       finding.relevance_score,
-      finding.broker_impact ?? null,
-      taskId
+      finding.broker_impact ?? null
     )
     .run();
+
+  return true;
 }
 
 // ─── Credit Balance ───

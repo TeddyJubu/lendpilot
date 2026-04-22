@@ -17,14 +17,14 @@ import {
 
 const RegulatoryFindingSchema = z.object({
   title: z.string().min(5),
-  source: z.string(),
-  document_type: z.string(),
+  source: z.enum(["FHA", "VA", "CFPB", "FHFA", "FNMA", "FHLMC", "NMLS", "STATE", "INDUSTRY"]),
+  document_type: z.enum(["mortgagee_letter", "circular", "bulletin", "press_release", "advisory", "enforcement", "industry_news"]),
   summary: z.string().min(10),
   published_date: z.string(),
   effective_date: z.string().optional(),
   affects_loan_types: z.array(z.string()).default([]),
   affects_states: z.array(z.string()).default([]),
-  url: z.string().optional().catch(undefined),
+  url: z.string().url().optional(),
   relevance_score: z.number().int().min(1).max(10),
   broker_impact: z.string().min(10),
 });

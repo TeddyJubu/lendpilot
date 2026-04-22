@@ -28,11 +28,11 @@ complex navigation paths, and items in industry news rather than official source
 2. **Scan industry news for broker-relevant updates**
    - Search: "mortgage broker guideline change [current month year]"
    - Search: "FHA VA conventional loan limit update [current year]"
-   - Search: "mortgage underwriting change 2025"
+   - Search: "mortgage underwriting change [current year]"
    - Check NationalMortgageProfessional.com, MortgageOrb.com, HousingWire.com
 
 3. **Identify DPA program changes**
-   - Search: "down payment assistance program [state] update 2025"
+   - Search: "down payment assistance program [state] update [current year]"
    - Check NCSHA (ncsha.org) for state housing finance agency news
    - Look for new programs, eligibility expansions, funding exhaustion notices
 

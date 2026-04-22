@@ -30,12 +30,12 @@ id = "YOUR_KV_NAMESPACE_ID"  # Run: wrangler kv namespace create CACHE
 # ─── Cron Triggers (scheduling) ───
 [triggers]
 crons = [
-  "0 2,6,10,14,18,22 * * *",   # Wholesale rates — every 4 hours
-  "0 10 * * *",                  # Retail rates — daily 6 AM ET (10 UTC)
-  "0 11 * * *",                  # Regulatory updates (structured crawler) — daily 7 AM ET
-  "0 12 * * 1",                  # DPA programs — Mondays 8 AM ET
-  "0 12 * * 3",                  # Agent: lender discovery — Wednesdays 8 AM ET
-  "0 12 * * 4"                   # Agent: regulatory deep scan — Thursdays 8 AM ET
+  "0 2,6,10,14,18,22 * * *",   # Wholesale rates — every 4 hours UTC
+  "0 10 * * *",                  # Retail rates — daily 10:00 UTC
+  "0 11 * * *",                  # Regulatory updates (structured crawler) — daily 11:00 UTC
+  "0 12 * * 1",                  # DPA programs — Mondays 12:00 UTC
+  "0 12 * * 3",                  # Agent: lender discovery — Wednesdays 12:00 UTC
+  "0 12 * * 4"                   # Agent: regulatory deep scan — Thursdays 12:00 UTC
 ]
 
 # ─── Environment Variables ───

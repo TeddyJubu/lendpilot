@@ -13,7 +13,7 @@ registry so they can be added to the automated rate scraper.
 ## Research Steps
 
 1. **Search for new TPO portals**
-   - Search: "new wholesale mortgage lender TPO portal 2025"
+   - Search: "new wholesale mortgage lender TPO portal [current year]"
    - Search: "mortgage broker wholesale lender rate sheet site:*.com"
    - Search: "[current year] wholesale mortgage lender launch"
    - Look for press releases, mortgage industry news (NationalMortgageProfessional, MortgageOrb,

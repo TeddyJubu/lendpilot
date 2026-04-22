@@ -14,10 +14,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SKILLS_DIR = join(__dirname, "..", "skills");
 
 function loadSkill(filename: string): string {
+  const skillPath = join(SKILLS_DIR, filename);
   try {
-    return readFileSync(join(SKILLS_DIR, filename), "utf-8");
-  } catch {
-    return "";
+    return readFileSync(skillPath, "utf-8");
+  } catch (error) {
+    throw new Error(`Failed to load required skill file: ${skillPath}`, { cause: error });
   }
 }
 

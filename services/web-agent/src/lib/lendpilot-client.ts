@@ -49,14 +49,21 @@ export interface IngestResult {
 }
 
 function workerUrl(path: string): string {
-  const base = process.env.LENDPILOT_WORKER_URL ?? "http://localhost:8787";
+  const base = process.env.LENDPILOT_WORKER_URL?.trim();
+  if (!base) {
+    throw new Error("Missing required environment variable: LENDPILOT_WORKER_URL");
+  }
   return `${base.replace(/\/$/, "")}${path}`;
 }
 
 function workerHeaders(): Record<string, string> {
+  const apiKey = process.env.LENDPILOT_WORKER_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("Missing required environment variable: LENDPILOT_WORKER_API_KEY");
+  }
   return {
     "Content-Type": "application/json",
-    "X-API-Key": process.env.LENDPILOT_WORKER_API_KEY ?? "",
+    "X-API-Key": apiKey,
   };
 }
 
@@ -67,6 +74,7 @@ export async function ingestDiscoveredLenders(
     method: "POST",
     headers: workerHeaders(),
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {
@@ -84,6 +92,7 @@ export async function ingestRegulatoryFindings(
     method: "POST",
     headers: workerHeaders(),
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {

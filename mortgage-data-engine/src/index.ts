@@ -45,11 +45,12 @@ export default {
    * Cron trigger handler — scheduled crawls
    *
    * Cron schedule (from wrangler.toml):
-   * - Every 4h: Wholesale rates
-   * - Daily 6AM ET: Retail rates
-   * - Daily 7AM ET: Regulatory updates (P1)
-   * - Weekly Mon: DPA programs (P1)
-   * - Weekly Wed: Realtor profiles (future P2)
+   * - Every 4h UTC: Wholesale rates
+   * - Daily 10 UTC: Retail rates
+   * - Daily 11 UTC: Regulatory updates (P1)
+   * - Weekly Mon 12 UTC: DPA programs (P1)
+   * - Weekly Wed 12 UTC: Agent lender discovery (P2)
+   * - Weekly Thu 12 UTC: Agent regulatory scan (P2)
    */
   async scheduled(
     event: ScheduledEvent,
@@ -111,17 +112,17 @@ export default {
  * Worker via POST /api/agent/ingest-*. This function just fires the task and
  * waits for the HTTP response (which arrives after the agent completes).
  *
- * Timeout: 25 minutes — agent tasks can take 2-4 minutes; CF Workers can await
- * up to 30 minutes in scheduled handlers via waitUntil.
+ * Timeout: 14 minutes — agent tasks can take 2-4 minutes; CF Workers can await
+ * up to 15 minutes in scheduled handlers via waitUntil.
  */
 async function callAgentTask(
   env: Env,
   task: "lender-discovery" | "regulatory-scan"
 ): Promise<{ success: boolean; errors: string[]; recordsCreated: number }> {
-  if (!env.FIRECRAWL_AGENT_URL) {
+  if (!env.FIRECRAWL_AGENT_URL || !env.FIRECRAWL_AGENT_API_KEY) {
     return {
       success: false,
-      errors: ["FIRECRAWL_AGENT_URL not configured — web-agent integration disabled"],
+      errors: ["FIRECRAWL_AGENT_URL or FIRECRAWL_AGENT_API_KEY not configured — web-agent integration disabled"],
       recordsCreated: 0,
     };
   }
@@ -149,14 +150,19 @@ async function callAgentTask(
       };
     }
 
-    const result = await response.json() as {
-      lenders_ingested?: number;
-      findings_ingested?: number;
-      errors?: string[];
+    const raw = await response.json();
+    const result = (typeof raw === "object" && raw !== null ? raw : {}) as {
+      lenders_ingested?: unknown;
+      findings_ingested?: unknown;
+      errors?: unknown;
     };
 
-    const recordsCreated = result.lenders_ingested ?? result.findings_ingested ?? 0;
-    const errors = result.errors ?? [];
+    const lendersIngested = typeof result.lenders_ingested === "number" ? result.lenders_ingested : 0;
+    const findingsIngested = typeof result.findings_ingested === "number" ? result.findings_ingested : 0;
+    const recordsCreated = lendersIngested + findingsIngested;
+    const errors = Array.isArray(result.errors)
+      ? result.errors.filter((e): e is string => typeof e === "string")
+      : [];
 
     return { success: errors.length === 0, errors, recordsCreated };
   } catch (err) {
